@@ -1,0 +1,10 @@
+matrushka("aes256","pass1"):
+	int b;
+	int a;
+	b = 5;
+	a = b + 3;
+	write a;
+	read b;
+	a = b + 3;
+	write a;
+endm

@@ -1,21 +1,29 @@
 %{
-#include <stdio.h>
-#include <string.h>
- 
-void yyerror(const char *str)
-{
-        fprintf(stderr,"error: %s\n",str);
+#define YYPARSER
+#include "common.h"
+
+static char* savedCode; /* stores code for later return */
+
+int yyerror(char * message)
+{ fprintf(listing,"Syntax error at line %d: %s\n",lineno,message);
+  fprintf(listing,"Current token: ");
+  printToken(yychar,lexeme);
+  Error = TRUE;
+  return 0;
 }
- 
-int yywrap()
-{
-        return 1;
-} 
+
+static int yylex(void)
+{ return nextToken(); }
   
 main()
 {
         yyparse();
 } 
+
+char * parse(void)
+{ yyparse();
+  return savedCode;
+}
 
 %}
 
@@ -29,9 +37,11 @@ main()
 %token LEFTPTKN RIGHTPTKN SEMICOLONTKN LEFTBTKN RIGHTBTKN COMMATKN OPENBLOCKTKN
 	
 %%
-program   				: vardeclarations functions matrushkas
-									| functions matrushkas
-									| matrushkas;
+program   				: a_gotomain vardeclarations functions matrushkas
+									| a_gotomain functions matrushkas
+									| a_gotomain matrushkas;
+									
+a_gotomain				: { savedCode = copyString("goto, , ,main"); }
 						
 vardeclarations   : vardeclarations vardeclaration
 							    | vardeclaration SEMICOLONTKN;

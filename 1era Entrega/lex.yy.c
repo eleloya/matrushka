@@ -166,7 +166,20 @@ extern FILE *yyin, *yyout;
 #define EOB_ACT_END_OF_FILE 1
 #define EOB_ACT_LAST_MATCH 2
 
-    #define YY_LESS_LINENO(n)
+    /* Note: We specifically omit the test for yy_rule_can_match_eol because it requires
+     *       access to the local variable yy_act. Since yyless() is a macro, it would break
+     *       existing scanners that call yyless() from OUTSIDE yylex. 
+     *       One obvious solution it to make yy_act a global. I tried that, and saw
+     *       a 5% performance hit in a non-yylineno scanner, because yy_act is
+     *       normally declared as a register variable-- so it is not worth it.
+     */
+    #define  YY_LESS_LINENO(n) \
+            do { \
+                yy_size_t yyl;\
+                for ( yyl = n; yyl < yyleng; ++yyl )\
+                    if ( yytext[yyl] == '\n' )\
+                        --yylineno;\
+            }while(0)
     
 /* Return all but the first "n" matched characters back to the input stream. */
 #define yyless(n) \
@@ -545,6 +558,13 @@ static yyconst flex_int16_t yy_chk[351] =
       117,  117,  117,  117,  117,  117,  117,  117,  117,  117
     } ;
 
+/* Table of booleans, true if rule could match eol. */
+static yyconst flex_int32_t yy_rule_can_match_eol[48] =
+    {   0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 1, 0, 0, 1, 0,     };
+
 static yy_state_type yy_last_accepting_state;
 static char *yy_last_accepting_cpos;
 
@@ -566,14 +586,16 @@ char *yytext;
 /* Luis Loya                         */
 /*************************************/
 #line 8 "syntax.l"
-#include <stdio.h>
-#include "y.tab.h"
-int linecount = 0;
+#include "common.h"
+//#include "y.tab.h"
+
+char lexeme[MAXTOKENLEXEME+1];
+int linecount = 1;
 /* Empezamos con las palabras reservadas */
 /* Seguido de los operadores */
 /* Seguido de los numeros */
 /* Seguido de los identificadores */
-#line 577 "lex.yy.c"
+#line 599 "lex.yy.c"
 
 #define INITIAL 0
 
@@ -755,9 +777,9 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 23 "syntax.l"
+#line 28 "syntax.l"
 
-#line 761 "lex.yy.c"
+#line 783 "lex.yy.c"
 
 	if ( !(yy_init) )
 		{
@@ -829,6 +851,16 @@ yy_find_action:
 
 		YY_DO_BEFORE_ACTION;
 
+		if ( yy_act != YY_END_OF_BUFFER && yy_rule_can_match_eol[yy_act] )
+			{
+			yy_size_t yyl;
+			for ( yyl = 0; yyl < yyleng; ++yyl )
+				if ( yytext[yyl] == '\n' )
+					   
+    yylineno++;
+;
+			}
+
 do_action:	/* This label is used only to access EOF actions. */
 
 		switch ( yy_act )
@@ -842,242 +874,242 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 24 "syntax.l"
+#line 29 "syntax.l"
 return IFTKN;
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 25 "syntax.l"
+#line 30 "syntax.l"
 return ENDIFTKN;
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 26 "syntax.l"
+#line 31 "syntax.l"
 return ELSETKN;
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 27 "syntax.l"
+#line 32 "syntax.l"
 return FUNCTKN;
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 28 "syntax.l"
+#line 33 "syntax.l"
 return ENDFUNCTKN;
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 29 "syntax.l"
+#line 34 "syntax.l"
 return RETURNFUNCTKN;
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 30 "syntax.l"
+#line 35 "syntax.l"
 return WHILETKN;
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 31 "syntax.l"
+#line 36 "syntax.l"
 return ENDWHILETKN;
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 32 "syntax.l"
+#line 37 "syntax.l"
 return READTKN;
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 33 "syntax.l"
+#line 38 "syntax.l"
 return WRITETKN;
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 34 "syntax.l"
+#line 39 "syntax.l"
 return MESSAGETKN;
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 35 "syntax.l"
+#line 40 "syntax.l"
 return MATRUSHKATKN;
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 36 "syntax.l"
+#line 41 "syntax.l"
 return ENDMATRUSHKATKN;
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 37 "syntax.l"
+#line 42 "syntax.l"
 return INTTKN;
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 38 "syntax.l"
+#line 43 "syntax.l"
 return DOUBLETKN;
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 39 "syntax.l"
+#line 44 "syntax.l"
 return STRINGTKN;
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 40 "syntax.l"
+#line 45 "syntax.l"
 return BOOLTKN;
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 41 "syntax.l"
+#line 46 "syntax.l"
 return TRUETKN;
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 42 "syntax.l"
+#line 47 "syntax.l"
 return FALSETKN;
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 43 "syntax.l"
+#line 48 "syntax.l"
 return ASSIGNTKN;
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 44 "syntax.l"
+#line 49 "syntax.l"
 return PLUSTKN;
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 45 "syntax.l"
+#line 50 "syntax.l"
 return MINUSTKN;
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 46 "syntax.l"
+#line 51 "syntax.l"
 return TIMESTKN;
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 47 "syntax.l"
+#line 52 "syntax.l"
 return DIVTKN;
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 48 "syntax.l"
+#line 53 "syntax.l"
 return LTTKN;
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 49 "syntax.l"
+#line 54 "syntax.l"
 return LTETKN;
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 50 "syntax.l"
+#line 55 "syntax.l"
 return GTTKN;
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 51 "syntax.l"
+#line 56 "syntax.l"
 return GTETKN;
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 52 "syntax.l"
+#line 57 "syntax.l"
 return EQUALTKN;
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 53 "syntax.l"
+#line 58 "syntax.l"
 return NOTEQUALTKN;
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 54 "syntax.l"
+#line 59 "syntax.l"
 return ASSIGNSECRETTKN;
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 55 "syntax.l"
+#line 60 "syntax.l"
 return ORTKN;
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 56 "syntax.l"
+#line 61 "syntax.l"
 return ANDTKN;
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 57 "syntax.l"
+#line 62 "syntax.l"
 return LEFTPTKN;
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 58 "syntax.l"
+#line 63 "syntax.l"
 return RIGHTPTKN;
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 59 "syntax.l"
+#line 64 "syntax.l"
 return SEMICOLONTKN;
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 60 "syntax.l"
+#line 65 "syntax.l"
 return LEFTBTKN;
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 61 "syntax.l"
+#line 66 "syntax.l"
 return RIGHTBTKN;
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 62 "syntax.l"
+#line 67 "syntax.l"
 return COMMATKN;
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 63 "syntax.l"
+#line 68 "syntax.l"
 return OPENBLOCKTKN;
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 64 "syntax.l"
+#line 69 "syntax.l"
 return INTVALTKN;
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 65 "syntax.l"
+#line 70 "syntax.l"
 return DOUBLEVALTKN;
 	YY_BREAK
 case 43:
 /* rule 43 can match eol */
 YY_RULE_SETUP
-#line 66 "syntax.l"
+#line 71 "syntax.l"
 return STRINGVALTKN;
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 67 "syntax.l"
+#line 72 "syntax.l"
 return IDTKN;
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 68 "syntax.l"
+#line 73 "syntax.l"
 {/* Ignore it */};
 	YY_BREAK
 case 46:
 /* rule 46 can match eol */
 YY_RULE_SETUP
-#line 69 "syntax.l"
+#line 74 "syntax.l"
 {linecount++;}
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 70 "syntax.l"
+#line 75 "syntax.l"
 ECHO;
 	YY_BREAK
-#line 1081 "lex.yy.c"
+#line 1113 "lex.yy.c"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -1438,6 +1470,10 @@ static int yy_get_next_buffer (void)
 
 	*--yy_cp = (char) c;
 
+    if ( c == '\n' ){
+        --yylineno;
+    }
+
 	(yytext_ptr) = yy_bp;
 	(yy_hold_char) = *yy_cp;
 	(yy_c_buf_p) = yy_cp;
@@ -1512,6 +1548,11 @@ static int yy_get_next_buffer (void)
 	c = *(unsigned char *) (yy_c_buf_p);	/* cast for 8-bit char's */
 	*(yy_c_buf_p) = '\0';	/* preserve yytext */
 	(yy_hold_char) = *++(yy_c_buf_p);
+
+	if ( c == '\n' )
+		   
+    yylineno++;
+;
 
 	return c;
 }
@@ -1982,6 +2023,9 @@ static int yy_init_globals (void)
      * This function is called from yylex_destroy(), so don't allocate here.
      */
 
+    /* We do not touch yylineno unless the option is enabled. */
+    yylineno =  1;
+    
     (yy_buffer_stack) = 0;
     (yy_buffer_stack_top) = 0;
     (yy_buffer_stack_max) = 0;
@@ -2074,6 +2118,76 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 70 "syntax.l"
+#line 75 "syntax.l"
 
+
+
+int yywrap()
+{
+        return 1;
+} 
+
+
+void printToken( Token token, const char* lexeme ){ 
+	switch (token){ 
+		case IFTKN: fprintf(outputFile, "reserved word: %s\n",lexeme); break;
+    case ELSETKN: fprintf(outputFile, "reserved word: %s\n",lexeme); break;
+    case ENDIFTKN: fprintf(outputFile, "reserved word: %s\n",lexeme); break;
+		case FUNCTKN: fprintf(outputFile, "reserved word: %s\n", lexeme); break;
+		case ENDFUNCTKN: fprintf(outputFile, "reserved word: %s\n", lexeme); break;
+		case RETURNFUNCTKN: fprintf(outputFile, "reserved word: %s\n", lexeme); break;
+    case WHILETKN: fprintf(outputFile, "reserved word: %s\n",lexeme); break;
+    case ENDWHILETKN: fprintf(outputFile, "reserved word: %s\n",lexeme); break;
+    case READTKN: fprintf(outputFile, "reserved word: %s\n",lexeme); break;
+    case WRITETKN: fprintf(outputFile, "reserved word: %s\n",lexeme); break;
+		case INTTKN: fprintf(outputFile, "reserved word: %s\n", lexeme); break;
+		case DOUBLETKN: fprintf(outputFile, "reserved word: %s\n", lexeme); break;
+		case STRINGTKN:  fprintf(outputFile, "reserved word: %s\n", lexeme); break;
+		case BOOLTKN: fprintf(outputFile, "reserved word: %s\n", lexeme); break;
+		case MATRUSHKATKN: fprintf(outputFile, "reserved word: %s\n", lexeme); break;
+		case ENDMATRUSHKATKN: fprintf(outputFile, "reserved word: %s\n", lexeme); break;
+		case MESSAGETKN: fprintf(outputFile, "reserved word: %s\n", lexeme); break;
+    case ASSIGNTKN: fprintf(outputFile,"=\n"); break;
+    case PLUSTKN: fprintf(outputFile,"+\n"); break;
+    case MINUSTKN: fprintf(outputFile,"-\n"); break;
+    case TIMESTKN: fprintf(outputFile,"*\n"); break;
+    case DIVTKN: fprintf(outputFile,"/\n"); break;
+    case LTTKN: fprintf(outputFile,"<\n"); break;
+		case LTETKN: fprintf(outputFile,"<=\n"); break;
+		case GTTKN: fprintf(outputFile,">\n"); break;
+		case GTETKN: fprintf(outputFile,">=\n"); break;
+    case EQUALTKN: fprintf(outputFile,"==\n"); break;
+		case NOTEQUALTKN: fprintf(outputFile,"!=\n"); break;
+		case ASSIGNSECRETTKN: fprintf(outputFile,"<<\n"); break;
+		case ORTKN: fprintf(outputFile,"||\n"); break;
+		case ANDTKN: fprintf(outputFile,"&&\n"); break;
+    case LEFTPTKN: fprintf(outputFile,"(\n"); break;
+    case RIGHTPTKN: fprintf(outputFile,")\n"); break;
+    case SEMICOLONTKN: fprintf(outputFile,";\n"); break;
+		case LEFTBTKN: fprintf(outputFile,"[\n"); break;
+		case RIGHTBTKN: fprintf(outputFile,"]\n"); break;
+		case COMMATKN: fprintf(outputFile,",\n"); break;
+		case OPENBLOCKTKN: fprintf(outputFile,":\n"); break;
+    case ENDFILETKN: fprintf(outputFile,"EOF\n"); break;
+    case INTVALTKN: fprintf(outputFile, "INTEGER val = %s\n",lexeme); break;
+		case DOUBLEVALTKN: fprintf(outputFile, "DOUBLE val = %s\n",lexeme); break;
+		case STRINGVALTKN: fprintf(outputFile, "STRING val = %s\n",lexeme); break;
+		case TRUETKN:  fprintf(outputFile, "BOOL val = %s\n",lexeme); break;
+		case FALSETKN: fprintf(outputFile, "BOOL val = %s\n",lexeme); break;
+    case IDTKN: fprintf(outputFile, "IDENTIFIER, name = %s\n",lexeme); break;
+    default: fprintf(outputFile,"undefined token: %d\n",token);
+  }
+}
+
+
+Token nextToken(void){ 
+  Token token;
+  yyin = inputFile;
+  yyout = outputFile;
+  token = yylex();
+  strncpy(lexeme,yytext,MAXTOKENLEXEME);
+  fprintf(outputFile,"%4d: ",linecount);
+  printToken(token,lexeme);
+  return token;
+}
 
