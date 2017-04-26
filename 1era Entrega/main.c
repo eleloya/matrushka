@@ -1,5 +1,4 @@
 #include "common.h"
-#include "lex.yy.c"
 
 FILE * inputFile;
 FILE * outputFile;
