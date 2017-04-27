@@ -1,10 +1,10 @@
+#include "common.h"
 #include "lex.yy.c"
 
 FILE * inputFile;
 FILE * outputFile;
 
 int main(int argc, char * argv[] ){ 
-	char *resultado;
   char filename[256]; //The name of the file containing the source code
   if (argc != 2){ 
 			fprintf(stderr,"Invalid command\n");
@@ -19,18 +19,15 @@ int main(int argc, char * argv[] ){
   		}
 	}
   outputFile = stdout;
-  
-	//fprintf(outputFile,"\nCompiling: %s\n",filename);
+  fprintf(outputFile,"\nCompiling: %s\n",filename);
 	
-	fprintf(outputFile,"\n###################");
-	fprintf(outputFile,"\n     COMPILING       ");
-	fprintf(outputFile,"\n###################\n\n");	
+	fprintf(outputFile,"\n   ###################");
+	fprintf(outputFile,"\n        SCANNER       ");
+	fprintf(outputFile,"\n   ###################\n\n");
 	
-  yyin = inputFile;
-  yyout = outputFile;
+	while (nextToken()!=ENDFILETKN);
 	
-	yyparse();	
-	
+	// free resources
   fclose(inputFile);
 	return 0;
 }
