@@ -579,15 +579,15 @@ int yy_flex_debug = 0;
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
 char *yytext;
-#line 1 "lex.l"
+#line 1 "syntax.l"
 /*************************************/
 /* File: matrushka.l                 */
 /* Lex specifications for MATRUSHKA  */
 /* Luis Loya                         */
 /*************************************/
-#line 8 "lex.l"
+#line 8 "syntax.l"
 #include "common.h"
-#include "y.tab.c"
+//#include "y.tab.h"
 
 char lexeme[MAXTOKENLEXEME+1];
 int linecount = 1;
@@ -777,7 +777,7 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 28 "lex.l"
+#line 28 "syntax.l"
 
 #line 783 "lex.yy.c"
 
@@ -874,239 +874,239 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 29 "lex.l"
+#line 29 "syntax.l"
 return IFTKN;
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 30 "lex.l"
+#line 30 "syntax.l"
 return ENDIFTKN;
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 31 "lex.l"
+#line 31 "syntax.l"
 return ELSETKN;
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 32 "lex.l"
+#line 32 "syntax.l"
 return FUNCTKN;
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 33 "lex.l"
+#line 33 "syntax.l"
 return ENDFUNCTKN;
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 34 "lex.l"
+#line 34 "syntax.l"
 return RETURNFUNCTKN;
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 35 "lex.l"
+#line 35 "syntax.l"
 return WHILETKN;
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 36 "lex.l"
+#line 36 "syntax.l"
 return ENDWHILETKN;
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 37 "lex.l"
+#line 37 "syntax.l"
 return READTKN;
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 38 "lex.l"
+#line 38 "syntax.l"
 return WRITETKN;
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 39 "lex.l"
+#line 39 "syntax.l"
 return MESSAGETKN;
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 40 "lex.l"
+#line 40 "syntax.l"
 return MATRUSHKATKN;
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 41 "lex.l"
+#line 41 "syntax.l"
 return ENDMATRUSHKATKN;
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 42 "lex.l"
+#line 42 "syntax.l"
 return INTTKN;
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 43 "lex.l"
+#line 43 "syntax.l"
 return DOUBLETKN;
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 44 "lex.l"
+#line 44 "syntax.l"
 return STRINGTKN;
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 45 "lex.l"
+#line 45 "syntax.l"
 return BOOLTKN;
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 46 "lex.l"
+#line 46 "syntax.l"
 return TRUETKN;
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 47 "lex.l"
+#line 47 "syntax.l"
 return FALSETKN;
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 48 "lex.l"
+#line 48 "syntax.l"
 return ASSIGNTKN;
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 49 "lex.l"
+#line 49 "syntax.l"
 return PLUSTKN;
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 50 "lex.l"
+#line 50 "syntax.l"
 return MINUSTKN;
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 51 "lex.l"
+#line 51 "syntax.l"
 return TIMESTKN;
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 52 "lex.l"
+#line 52 "syntax.l"
 return DIVTKN;
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 53 "lex.l"
+#line 53 "syntax.l"
 return LTTKN;
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 54 "lex.l"
+#line 54 "syntax.l"
 return LTETKN;
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 55 "lex.l"
+#line 55 "syntax.l"
 return GTTKN;
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 56 "lex.l"
+#line 56 "syntax.l"
 return GTETKN;
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 57 "lex.l"
+#line 57 "syntax.l"
 return EQUALTKN;
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 58 "lex.l"
+#line 58 "syntax.l"
 return NOTEQUALTKN;
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 59 "lex.l"
+#line 59 "syntax.l"
 return ASSIGNSECRETTKN;
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 60 "lex.l"
+#line 60 "syntax.l"
 return ORTKN;
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 61 "lex.l"
+#line 61 "syntax.l"
 return ANDTKN;
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 62 "lex.l"
+#line 62 "syntax.l"
 return LEFTPTKN;
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 63 "lex.l"
+#line 63 "syntax.l"
 return RIGHTPTKN;
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 64 "lex.l"
+#line 64 "syntax.l"
 return SEMICOLONTKN;
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 65 "lex.l"
+#line 65 "syntax.l"
 return LEFTBTKN;
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 66 "lex.l"
+#line 66 "syntax.l"
 return RIGHTBTKN;
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 67 "lex.l"
+#line 67 "syntax.l"
 return COMMATKN;
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 68 "lex.l"
+#line 68 "syntax.l"
 return OPENBLOCKTKN;
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 69 "lex.l"
-yylval = strdup(yytext); return INTVALTKN;
+#line 69 "syntax.l"
+return INTVALTKN;
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 70 "lex.l"
-yylval = strdup(yytext); return DOUBLEVALTKN;
+#line 70 "syntax.l"
+return DOUBLEVALTKN;
 	YY_BREAK
 case 43:
 /* rule 43 can match eol */
 YY_RULE_SETUP
-#line 71 "lex.l"
-yylval = strdup(yytext); return STRINGVALTKN;
+#line 71 "syntax.l"
+return STRINGVALTKN;
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 72 "lex.l"
-yylval = strdup(yytext); return IDTKN;
+#line 72 "syntax.l"
+return IDTKN;
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 73 "lex.l"
+#line 73 "syntax.l"
 {/* Ignore it */};
 	YY_BREAK
 case 46:
 /* rule 46 can match eol */
 YY_RULE_SETUP
-#line 74 "lex.l"
+#line 74 "syntax.l"
 {linecount++;}
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 75 "lex.l"
+#line 75 "syntax.l"
 ECHO;
 	YY_BREAK
 #line 1113 "lex.yy.c"
@@ -2118,7 +2118,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 75 "lex.l"
+#line 75 "syntax.l"
 
 
 
@@ -2181,13 +2181,9 @@ void printToken( Token token, const char* lexeme ){
 
 
 Token nextToken(void){ 
-	static int firstTime = TRUE;
   Token token;
-	if(firstTime){
-	  yyin = inputFile;
-	  yyout = outputFile;
-		firstTime = FALSE;
-	}
+  yyin = inputFile;
+  yyout = outputFile;
   token = yylex();
   strncpy(lexeme,yytext,MAXTOKENLEXEME);
   fprintf(outputFile,"%4d: ",linecount);

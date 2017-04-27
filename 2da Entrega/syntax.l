@@ -6,7 +6,7 @@
 
 %{
 #include "common.h"
-#include "y.tab.c"
+//#include "y.tab.h"
 
 char lexeme[MAXTOKENLEXEME+1];
 int linecount = 1;
@@ -66,10 +66,10 @@ newline \n
 "]" return RIGHTBTKN;
 "," return COMMATKN;
 ":" return OPENBLOCKTKN;
-{integer} yylval = strdup(yytext); return INTVALTKN;
-{double} yylval = strdup(yytext); return DOUBLEVALTKN;
-{string} yylval = strdup(yytext); return STRINGVALTKN;
-{identifier} yylval = strdup(yytext); return IDTKN;
+{integer} return INTVALTKN;
+{double} return DOUBLEVALTKN;
+{string} return STRINGVALTKN;
+{identifier} return IDTKN;
 {whitespace} {/* Ignore it */};
 {newline} {linecount++;}
 %%
@@ -133,13 +133,9 @@ void printToken( Token token, const char* lexeme ){
 
 
 Token nextToken(void){ 
-	static int firstTime = TRUE;
   Token token;
-	if(firstTime){
-	  yyin = inputFile;
-	  yyout = outputFile;
-		firstTime = FALSE;
-	}
+  yyin = inputFile;
+  yyout = outputFile;
   token = yylex();
   strncpy(lexeme,yytext,MAXTOKENLEXEME);
   fprintf(outputFile,"%4d: ",linecount);

@@ -1,0 +1,8 @@
+int b;
+
+matrushka("aes256","pass1"):
+	double a;
+	a = 5.3;
+	b = 3;
+	a = a + b * c;
+endm

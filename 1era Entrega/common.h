@@ -6,8 +6,8 @@
 #include <ctype.h>
 #include <string.h>
 
-#ifndef YYPARSER
-#include "y.tab.h"
+#define MAXTOKENLEXEME 112
+extern char lexeme[MAXTOKENLEXEME+1];
 #define ENDFILETKN 0
 
 #ifndef FALSE
@@ -22,9 +22,7 @@ typedef int Token;
 
 extern FILE* inputFile;
 extern FILE* outputFile;
-extern int lineno;
-#endif
-#define MAXTOKENLEXEME 112
-extern char lexeme[MAXTOKENLEXEME+1];
-char *parse(void);
+extern int linecount;
+extern int yyparse(void);
+
 #endif
