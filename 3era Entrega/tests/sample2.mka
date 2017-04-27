@@ -1,0 +1,43 @@
+// save_cipher("aes256","passphrase")
+cipher "aes256", "passphrase";
+
+int count;
+bool test;
+string tmp;
+
+//Auxiliary Functions
+func string:concat(string sleft, string sright):
+	string result;
+	// symbol_a = get_symbol(a,concat);
+	// symbol_b = get_symbol(b,concat);
+	// 
+	// constant and vars could be a struct holding the the lexeme 
+	// push_type b
+	// push_type a
+	// push_type 3
+	// (+) pop3 popB
+	// -> if op(+,3,b): push_type tmp : syntax_error
+	// (+) poptmp popa
+	// -> if op(+,tmp,a): push_type tmp2 : syntax_error
+	// (=) poptmp2
+	// -> if op(=,result,tmp2) : allow : syntax_error
+	result = sleft + sright + tmp; 
+	
+	// check_return(concat,result) : allow : syntax_error
+	return result + "jaja";
+endf
+	
+func int:sum(int x, int y):
+	return x + y;
+endf
+
+
+func int:main():
+	int suma_resultado;
+	string tmp;
+	suma_resultado = sum(1,2);
+	
+	read tmp;
+	write "lero" + "lero";
+	return 0;
+endf
