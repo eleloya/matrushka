@@ -22,15 +22,14 @@ int main(int argc, char * argv[] ){
   
 	//fprintf(outputFile,"\nCompiling: %s\n",filename);
 	
-	fprintf(outputFile,"\n   ###################");
-	fprintf(outputFile,"\n        COMPILING       ");
-	fprintf(outputFile,"\n   ###################\n\n");
-	fprintf(outputFile,"LINE  TOKEN\n");
+	fprintf(outputFile,"\n###################");
+	fprintf(outputFile,"\n     COMPILING       ");
+	fprintf(outputFile,"\n###################\n\n");	
 	
   yyin = inputFile;
   yyout = outputFile;
 	
-	yyparse();
+	yyparse();	
 	
   fclose(inputFile);
 	return 0;
