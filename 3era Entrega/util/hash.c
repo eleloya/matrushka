@@ -5,7 +5,8 @@ A01111663
 #include <stdio.h>
 #include <string.h>
 
-#define HASH_TABLE_SIZE 2048
+//Hashes work better if the size is prime
+#define HASH_TABLE_SIZE 2131
 
 struct hashrecord{
     char *value; //identifierName
@@ -76,13 +77,18 @@ char * memberKind(struct hashrecord hashtable[], char *identifierName, char *con
 		return hashtable[b].symbolKind;
 }
 
+
 char * memberType(struct hashrecord hashtable[], char *identifierName, char *contextName){
-	unsigned int b = locate(hashtable, identifierName, contextName);
+	unsigned int b = locate(hashtable, identifierName, contextName);	
+	if (NULL == hashtable[b].value){
+		 b = locate(hashtable, identifierName, "global");
+  }		
 	
-	if (NULL == hashtable[b].value)
+	if (NULL == hashtable[b].value){
 		return NULL;
-	else
+	}else{
 		return hashtable[b].typeName;
+	}
 }
 
 int insert(struct hashrecord hashtable[], char *typeName, char *identifierName, char *contextName, char *symbolKind){

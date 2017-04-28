@@ -68,7 +68,7 @@ void get_symbol(char *identifierName, char *contextName, char *symbolKind){
 	response_local  = member(symbolTable, identifierName, contextName);
 	response_global = member(symbolTable, identifierName, "global");
 	if(response_local==0 && response_global==0){
-		printf("Symbol %s on %s:%s\n", identifierName, contextName, symbolKind);
+		//printf("Symbol %s on %s:%s\n", identifierName, contextName, symbolKind);
 		yyerror("ERROR: trying to use inexisting variable");
 		return;
 	}
@@ -96,72 +96,117 @@ char *getTypeFromToken(int token){
 	}
 }
 
+int typeDict(char *typeName){
+	if(typeName==NULL){
+		return -1;
+	}
+	if(strcmp(typeName,"int")==0){
+		return 1;
+	}else if(strcmp(typeName,"double")==0){
+		return 2;
+	}else if(strcmp(typeName,"string")==0){
+		return 3;
+	}else if(strcmp(typeName,"boolean")==0){
+		return 4;
+	}else{
+		return -1; // Undefined type
+	}
+}
+
 /* Dictionary. Gets the Token type of a value. 
 STRING->TOKEN 
 */
-Token getTypeFromValue(char *value){
-	Token token;
+char *getTypeFromValue(char *value){
 	if(strstr(value, "\"") != NULL) {
-		token = STRINGVALTKN;
+		return "string";
 	}else if(strstr(value, ".") != NULL) {
-		token = DOUBLEVALTKN;
+		return "double";
 	}else if(strstr(value, "true") != NULL) {
-		token = TRUETKN;
+		return "boolean";
 	}else if(strstr(value, "false") != NULL) {
-		token = FALSETKN;
+		return "boolean";
 	}else{
-		token = INTVALTKN;
+		return "int";
 	}
-	return token;
 }
 
-void pushType(char *value){
+void pushType(char *value, char *symbolKind){
 	static int firstTime = TRUE;
-	
-	Token token;
-	token = getTypeFromValue(value);
+	char *factorType;
 	if(firstTime){
 		stackInit(&typeStack);
 		firstTime = FALSE;
 	}
 	
-	stackPush(&typeStack,token);
-	printf("Pushing %s:%s\n", getTypeFromToken(token), value);
+	if(strcmp(symbolKind,"const")==0){ // then is a constant
+		factorType = getTypeFromValue(value);
+		//printf("Retrived type for %s is %s\n\n", value, factorType);
+	}else{ // then is a variable or a function
+		factorType = memberType(symbolTable, value, getContext());
+		//printf("Retrived type for %s is %s in context: %s\n\n", value, factorType, getContext());
+	}
+	
+	// We must transform the type into a int because these stack only holds integers
+	stackPush(&typeStack,typeDict(factorType));
+	//DEBUG
+	//printf("Pushing %d:%s:%s\n", typeDict(factorType), factorType, value);
 	
 }
 
-char *opDict(int op){
-	//op
-	// 1 - plus
-	// 2 - minus
-	// 3 - times
-	// 4 - div
-	if(op==1)
-		return " + ";
-	if(op==2)
-		return " - ";
-	if(op==3)
-		return " * ";
-	if(op==4)
-		return " / ";
-	if(op==5)
-		return " secret ";
+void checkStmt(char *st, char *valuea, char *valueb){
 	
-	return "undefined";
-}
-
-void checkType(int op, char* sender){
-	//op
-	// 1 - plus
-	// 2 - minus
-	// 3 - times
-	// 4 - div
+	pushType(valuea, "var");
 	
-	printf("\nno mames quien me mando aca : %s\n\n", sender);
+	//Llego aca?
 	int a = stackPop(&typeStack);
   int b = stackPop(&typeStack);
 	
+	//DEBUG
+	//printf("--> Checking statement '%s' for %s:%s\n", st, valuea, valueb);
+	//printf("Popped: %d:%s\n",a,valuea);
+	//printf("Popped: %d:%s\n",b,valueb);
+	
+	if(a!=b){
+		if(strcmp(st,"=")==0)
+			yyerror("ERROR: type conflict inside assignment");
+		else
+			yyerror("ERROR: type conflict inside return");
+	}else{
+		//DEBUG
+		//printf("--> NOISE\n");
+		
+	}
+}
+
+void checkExp(char *op, char *valuea, char *valueb){
+	int a = stackPop(&typeStack);
+  int b = stackPop(&typeStack);
+	
+	// Aqui deberia tecnicamente hacer un cubo semantico
+	// Verificar que la operacion con los dos tipos es permitida
+	// Realmente, solo vamos a checar que sean del mismo tipo los dos operadores
 	// if operation_permitted(a,b,op);
+	
+	//DEBUG
+	//printf("Popped: %d:%s\n",a,valuea);
+	//printf("Popped: %d:%s\n",b,valueb);
+	
+	if(a!=b){
+		yyerror("ERROR: type conflict inside expression");
+		//DEBUG
+		//printf("Pushing %d:%s:%s\n", -1, valuea, valueb);
+		stackPush(&typeStack,-1);
+	}else{
+		// Either one is fine really
+		stackPush(&typeStack,a);
+		//stackPush(&typeStack,b);
+		
+		//DEBUG
+		//printf("Pushing %d:%s%s%s\n", a, valuea, op, valueb);
+		
+	}
+	
+	
 	
 	//printf("For OP: %s\tOP1:%s\tOP2:%s\r\n\r\n",opDict(op),getTypeFromToken(a),getTypeFromToken(b));
 	//tecnicamente aqui deberia de insertar el resultado de operation_permitted
@@ -171,7 +216,6 @@ void checkAssign(char *a, char *op, char *b){
 	printf("Identifier: %s\n", a);
 	printf("Type of (identifier) %s\n", a);
 	printf("Value of tmp: %s\n", b);
-	printf("Type of (tmp): %s\n\n", getTypeFromToken(getTypeFromValue(b)));
 }
 
 %}
@@ -203,7 +247,7 @@ secret						: CIPHERTKN STRINGVALTKN COMMATKN STRINGVALTKN SEMICOLONTKN
 functions         : functions function
 									| function;
 
-function					: FUNCTKN type OPENBLOCKTKN IDTKN {setContext($4); save_symbol($2, $4, "global", "func");  } LEFTPTKN params RIGHTPTKN OPENBLOCKTKN funcbody returnstmt ENDFUNCTKN;
+function					: FUNCTKN type OPENBLOCKTKN IDTKN {setContext($4); save_symbol($2, $4, "global", "func");  } LEFTPTKN params RIGHTPTKN OPENBLOCKTKN funcbody returnstmt { checkStmt("ret", $4, $11);} ENDFUNCTKN;
 
 funcbody					: /* empty */ | vardeclarations blockstmts
 									| blockstmts
@@ -220,7 +264,7 @@ vardeclarations   : vardeclarations vardeclaration SEMICOLONTKN;
 							    | vardeclaration SEMICOLONTKN;
 
 vardeclaration    : type IDTKN { save_symbol($1, $2, getContext(), "var"); }
-								  | type IDTKN LEFTBTKN INTVALTKN RIGHTBTKN; /* int arreglo[3]; */
+								  | type IDTKN LEFTBTKN INTVALTKN RIGHTBTKN { save_symbol($1, $2, getContext(), "ary"); } ; /* int arreglo[3]; */
 
 type   						: INTTKN | DOUBLETKN | STRINGTKN | BOOLTKN;
 
@@ -235,8 +279,8 @@ ifstmt            : IFTKN LEFTPTKN expstmt RIGHTPTKN OPENBLOCKTKN blockstmts END
 
 iterstmt					: WHILETKN LEFTPTKN expstmt RIGHTPTKN OPENBLOCKTKN blockstmts ENDWHILETKN;
 
-assignstmt        : IDTKN ASSIGNTKN expstmt { get_symbol($1, getContext(), "var");}
-									| IDTKN LEFTBTKN INTVALTKN RIGHTBTKN ASSIGNTKN expstmt  { get_symbol($1, getContext(), "ary");};
+assignstmt        : IDTKN ASSIGNTKN expstmt { get_symbol($1, getContext(), "var"); checkStmt("=", $1, $3); }
+									| IDTKN LEFTBTKN INTVALTKN RIGHTBTKN ASSIGNTKN expstmt  { get_symbol($1, getContext(), "ary"); checkStmt("=", $1, $3); };
 									
 iostmt            : READTKN var  { get_symbol($2, getContext(), "var");}
 									| WRITETKN expstmt;
@@ -251,13 +295,13 @@ expstmt           : expstmt compoperator exp
 
 compoperator      : LTTKN | LTETKN | GTTKN | GTETKN | EQUALTKN | NOTEQUALTKN | ORTKN | ANDTKN;
 
-exp               : exp PLUSTKN term 
-									| exp MINUSTKN term 
+exp               : exp PLUSTKN term { checkExp("+", $1, $3); }
+									| exp MINUSTKN term  { checkExp("-", $1, $3); }
 									| term;
 
-term    					: term TIMESTKN factor 
-									| term DIVTKN factor 
-									| factor;
+term    					: term TIMESTKN factor  { checkExp("*", $1, $3); }
+									| term DIVTKN factor  { checkExp("/", $1, $3); }
+									| factor
 
 values            : INTVALTKN 
 									| DOUBLEVALTKN  
@@ -266,24 +310,25 @@ values            : INTVALTKN
 									| FALSETKN;
 
 factor            : LEFTPTKN exp RIGHTPTKN
-									| var  { print("Pushing a var type into typeStack: %s\n", $1); pushType($1); get_symbol($1, getContext(), "var");}
-									| values { print("Pushing constant type into typeStack: %s\n", $1); pushType($1); }
-									| callstmt { print("Pushing function type into typeStack:%s\n", $1); pushType($1); ;
+									| var  { /* printf("Pushing a var type into typeStack: %s\n", $1); */ get_symbol($1, getContext(), "var"); pushType($1, "id"); }
+									| values { /* printf("Pushing constant type into typeStack: %s\n", $1); */ pushType($1, "const"); }
+									| callstmt { /* printf("Pushing function type into typeStack:%s\n", $1); */ pushType($1, "func"); } ;
 
 //faltaria checar que existen los args_context									
-callstmt          : IDTKN LEFTPTKN args RIGHTPTKN  { get_symbol($1, "global", "func");};
+callstmt          : IDTKN LEFTPTKN args RIGHTPTKN  { get_symbol($1, "global", "func"); };
 
+// Me falta la semantica de variables
 args              : /* empty */ | arglist
 arglist           : arglist COMMATKN exp | exp;
 
-returnstmt        : RETURNFUNCTKN exp SEMICOLONTKN;
+returnstmt        : RETURNFUNCTKN exp SEMICOLONTKN { $$ = $2; };
 		
 %%
 
 
 int yyerror(char * message)
 	
-{ fprintf(outputFile,"Syntax error at line %d: %s\n",linecount,message);
+{ fprintf(outputFile,"at line %d: %s\n",linecount,message);
   //fprintf(outputFile,"token: %d\n\n", yychar);
   return 1;
 }

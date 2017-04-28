@@ -39,8 +39,8 @@ int stackPop(stack *s){
 		return -1;
 	}
 	
-	printf("Debug stackPop() s->size = %d\r\n", s->size);
-	printf("Debug stackPop() s->data = %d\r\n\r\n", s->data[s->size - 1]);
+	//printf("Debug stackPop() s->size = %d\r\n", s->size);
+	//printf("Debug stackPop() s->data = %d\r\n\r\n", s->data[s->size - 1]);
 
 	return s->data[--s->size];
 }
