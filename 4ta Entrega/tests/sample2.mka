@@ -1,0 +1,48 @@
+// save_cipher("aes256","passphrase")
+cipher "aes256", "passphrase";
+
+int count;
+bool test;
+string afdright;
+
+//Auxiliary Functions
+
+func string:concat(string sleft, string sright):
+	string result;
+	
+	result = sleft + sright + afdright; 
+	
+	// check_return(concat,result) : allow : syntax_error
+	return "jeje";
+endf
+	
+func int:sum(int x, int y):
+	int resulta;
+	if((x+y)>y || true):
+		resulta = x + y;
+	else
+		resulta = x - y;
+	endi
+	return resulta;
+endf
+
+
+func int:main():
+	int suma_resultado;
+	string tmp;
+	//add_lista_a (1+2)
+	//add_lista_a 2
+	//check_signature(sum,pila_p)
+	// -> generame lista de parametros parasum.
+	// -> Si la lista paramsum termina esta mas grande que lista_a : error (insuffucient params)
+	// -> Si la lista paramsum termina esta mas pequeña que lista_a : error (more params than need)
+	//
+	// -> remover elementos de paramsum con el mismo tipo que lista_a
+	// 		-> Si la lista paramsum termina vacia cool
+	// -> si no se puede remover algo: error (bad signature)
+	suma_resultado = sum(1+2,2);
+	
+	read tmp;
+	write "lero" + "lero";
+	return 3;
+endf
