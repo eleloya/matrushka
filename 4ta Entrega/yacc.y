@@ -64,9 +64,34 @@ void PRG_SetScope(char *scopeName){
 */
 char * PRG_GetScope(){	
 	if(VERBOSE)
-		printf("LINE: %-4d PGR_GetScope()->%s\n", g_lineno, scope);
+		printf("LINE: %-4d PGR_GetScope() -> %s\n", g_lineno, scope);
 	
 	return scope;
+}
+
+/*
+* Used in the grammar rules (expcmp,exp,term,factor) for semantic analysis.
+*
+*/
+void EXP_PushOperator(char *op){
+	//Always checking
+	if (NULL==op){
+		printf("LINE: %-4d  CALL: EXP_PushOperator(NULL)\t", g_lineno);
+		printf("FATAL: Null reference.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	// REWORK / TO-DO
+	// Maybe possible to move this code to some kind of initializer
+	if(operatorStackFirstTime){
+		stackInit(&operatorStack);
+		operatorStackFirstTime = FALSE;
+	}
+	
+	stackPush(&operatorStack,op);
+	
+	if(VERBOSE)
+		printf("LINE: %-4d EXP_PushOperator(%s)\n", g_lineno, op);	
 }
 
 // save_symbol("int","counter","global","var")
@@ -141,43 +166,28 @@ char *getTypeFromValue(char *value){
 	}
 }
 
-void pushType(char *value, char *symbolKind){
-	static int firstTime = TRUE;
-	char *factorType;
-	if(firstTime){
-		stackInit(&typeStack);
-		firstTime = FALSE;
-	}
+char *getTypeFromSymbol(char *symbol){
+	//TO-DO check for nulls on symbol
 	
-	if(strcmp(symbolKind,"const")==0){ // then is a constant
-		factorType = getTypeFromValue(value);
-		//printf("Retrived type for %s is %s\n\n", value, factorType);
-	}else{ // then is a variable or a function
-		factorType = memberType(SymbolTable, value, PRG_GetScope());
-		//printf("Retrived type for %s is %s in scope: %s\n\n", value, factorType, PRG_GetScope());
-	}
-	
-	// We must transform the type into a int because these stack only holds integers
-	stackPush(&typeStack,factorType);
-	//DEBUG
-	//printf("Pushing %d:%s:%s\n", typeDict(factorType), factorType, value);
-	
+	return memberType(SymbolTable, symbol, PRG_GetScope());
 }
 
-void checkStmt(char *st, char *valuea, char *valueb){
+void SMT_CheckStatement(char *st, char *symbol){
+	//TO-DO Check for NULLS
+	char *typeName;
 	
-	pushType(valuea, "var");
+	if(strcmp(st,"return")==0){
+		typeName = symbol;
+	}else{
+		typeName = getTypeFromSymbol(symbol);
+	}
 	
-	//Llego aca?
-	char * a = stackPop(&typeStack);
-  char * b = stackPop(&typeStack);
+	char * returnVal = stackPop(&typeStack);	
+	if(VERBOSE)
+		printf("LINE: %-4d SMT_CheckStatement(%s,%s) // stackPOP(typeStack)=%s  \n", g_lineno, st,symbol, returnVal);
 	
-	//DEBUG
-	//printf("--> Checking statement '%s' for %s:%s\n", st, valuea, valueb);
-	//printf("CHECK(%s) Popped: %d\n",st,a);
-	//printf("CHECK(%s) Popped: %d\n",st,b);
-	
-	if(strcmp(a,b)!=0){
+	//TO-DO Should really abort here. Use previous convention for closing
+	if(strcmp(typeName,returnVal)!=0){
 		if(strcmp(st,"=")==0)
 			yyerror("ERROR: type conflict inside assignment");
 		else
@@ -187,11 +197,17 @@ void checkStmt(char *st, char *valuea, char *valueb){
 		//printf("--> NOISE\n");
 		
 	}
+	
+	
+	if(VERBOSE)
+		printf("LINE: %-4d SMT_CheckStatement(%s,%s)\n", g_lineno, st,symbol);
+	
+	free(returnVal);
 }
 
-void checkExp(char *op, char *valuea, char *valueb){
+void SMT_CheckExp(char *op, char *valuea, char *valueb){
 	char * a = stackPop(&typeStack);
-  char * b = stackPop(&typeStack);
+  	char * b = stackPop(&typeStack);
 	
 	// Aqui deberia tecnicamente hacer un cubo semantico
 	// Verificar que la operacion con los dos tipos es permitida
@@ -199,8 +215,11 @@ void checkExp(char *op, char *valuea, char *valueb){
 	// if operation_permitted(a,b,op);
 	
 	//DEBUG
-	printf("check(%s): %s:%s\n",op,a,valueb);
-	printf("check(%s): %s:%s\n",op,b,valuea);
+	
+	//Estan en orden inverso el stack
+	if(VERBOSE)
+		printf("LINE: %-4d SMT_CheckExp(\"%s\",\"%s\":%s,\"%s\":%s)\n", g_lineno, op, valueb, a, valuea, b);
+
 	
 	if(strcmp(a,b)!=0){
 		yyerror("ERROR: type conflict inside expression");
@@ -229,33 +248,6 @@ void checkAssign(char *a, char *op, char *b){
 	printf("Value of tmp: %s\n", b);
 }
 
-void pushOperator(char *op){
-	// Unfortunely we need to add these to all attributes for expression code_generation
-	if(operatorStackFirstTime){
-		stackInit(&operatorStack);
-		operatorStackFirstTime = FALSE;
-	}
-	
-	stackPush(&operatorStack,op);
-	printf("Pushed: %s to operatorStack\n", op);
-	
-}
-
-void pushOperand(char *operand, char *kind){
-	
-	// I don't know why i'm asking for kind. I guess is important if the operator is of function kind. Time will tell.
-	// It may prove important at code generation time.
-	
-	if(operandStackFirstTime){
-		stackInit(&operandStack);
-		operandStackFirstTime = FALSE;
-	}
-	
-	stackPush(&operandStack, operand);
-	printf("Pushed: %s:%s to operandStack\n", kind,operand);
-	
-}
-
 void cg_exp(){
 	//Si el top de pila de operadores = +, -, *, /, ||, &&, !=, <, <=, >=, > entonces
 	//operador = stackOperadorTOP
@@ -276,7 +268,9 @@ void cg_exp(){
 	//If operand 1 or 2 have temporals, push them back to temporalStack... para hacer reuso de las temporales I GUESS
 	stackPush(&operandStack,resultado);
 	
-	printf("  %3s %-8s %-5s %-5s\n\n",operator, operand1, operand2, resultado);
+	
+	if(VERBOSE)
+		printf("LINE: %-4d EXP_MakeQuadruple(%s,%s,%s,%s)\n", g_lineno, operator,operand1,operand2, resultado);
 	
 	//Creo que aqui deberia haber type-checking o dejarlo en la funcion anterior da igual
 }
@@ -312,6 +306,52 @@ void generateTemporals(){
 	
 }
 
+void pushType(char *value, char *symbolKind){
+	static int firstTime = TRUE;
+	char *factorType;
+	if(firstTime){
+		stackInit(&typeStack);
+		firstTime = FALSE;
+	}
+	
+	if(strcmp(symbolKind,"const")==0){ // then is a constant
+		factorType = getTypeFromValue(value);
+		//printf("Retrived type for %s is %s\n\n", value, factorType);
+	}else{ // then is a variable or a function
+		factorType = memberType(SymbolTable, value, PRG_GetScope());
+		//printf("Retrived type for %s is %s in scope: %s\n\n", value, factorType, PRG_GetScope());
+	}
+	
+	// We must transform the type into a int because these stack only holds integers
+	stackPush(&typeStack,factorType);
+	//DEBUG
+	//printf("Pushing %d:%s:%s\n", typeDict(factorType), factorType, value);
+	
+}
+
+void pushOperand(char *operand, char *kind){
+	if(operandStackFirstTime){
+		stackInit(&operandStack);
+		operandStackFirstTime = FALSE;
+	}
+	stackPush(&operandStack, operand);
+}
+
+void EXP_PushOperand(char *operand, char *symbolKind){
+	//TO-DO Check for NULLS
+	
+	//Check for the existance of such variable before even continuing.
+	if(strcmp(symbolKind,"var")==0)
+		get_symbol(operand, PRG_GetScope(), "var"); 
+	
+	//Later is the same for both expressions
+	pushType(operand, symbolKind); 
+	pushOperand(operand, symbolKind);
+	
+	if(VERBOSE)
+		printf("LINE: %-4d EXP_PushOperand(%s,%s)\n", g_lineno, operand,symbolKind);
+}
+
 %}
 
 //Reserved Words
@@ -328,93 +368,92 @@ void generateTemporals(){
 
 %%
 
-program   				: secrets { generateTemporals();PRG_SetScope("global");  }  vardeclarations functions { print_hash_table(SymbolTable); }
-									| secrets { generateTemporals();PRG_SetScope("global");  } functions
+program   		: secrets { generateTemporals();PRG_SetScope("global");  }  vardeclarations functions { print_hash_table(SymbolTable); }
+				| secrets { generateTemporals();PRG_SetScope("global");  } functions
 										
 
-secrets						: secrets secret
-									| secret
+secrets			: secrets secret
+				| secret
 
-secret						: CIPHERTKN STRINGVALTKN COMMATKN STRINGVALTKN SEMICOLONTKN
+secret			: CIPHERTKN STRINGVALTKN COMMATKN STRINGVALTKN SEMICOLONTKN
 
-functions         : functions function
-									| function;
+functions       : functions function
+				| function;
 
-function					: FUNCTKN type OPENBLOCKTKN IDTKN {PRG_SetScope($4); save_symbol($2, $4, "global", "func");  } LEFTPTKN params RIGHTPTKN OPENBLOCKTKN funcbody returnstmt { checkStmt("ret", $4, $11);} ENDFUNCTKN;
+function		: FUNCTKN type OPENBLOCKTKN IDTKN {PRG_SetScope($4); save_symbol($2, $4, "global", "func");  } LEFTPTKN params RIGHTPTKN OPENBLOCKTKN funcbody returnstmt { SMT_CheckStatement("return", $2);} ENDFUNCTKN;
 
-funcbody					: /* empty */ | vardeclarations blockstmts
-									| blockstmts
+funcbody		: /* empty */ | vardeclarations blockstmts
+				| blockstmts
 
-params						: /* empty */ | paramlist;
+params			: /* empty */ | paramlist;
 
-paramlist         : paramlist COMMATKN param 
-									| param;
+paramlist       : paramlist COMMATKN param 
+				| param;
 
-param             : type IDTKN { save_symbol($1, $2, PRG_GetScope(), "param"); };  /* no arrays as parameters... yet*/
+param           : type IDTKN { save_symbol($1, $2, PRG_GetScope(), "param"); };  /* no arrays as parameters... yet*/
 
 						
-vardeclarations   : vardeclarations vardeclaration SEMICOLONTKN;
-							    | vardeclaration SEMICOLONTKN;
+vardeclarations : vardeclarations vardeclaration SEMICOLONTKN;
+				| vardeclaration SEMICOLONTKN;
 
-vardeclaration    : type IDTKN { save_symbol($1, $2, PRG_GetScope(), "var"); }
-								  | type IDTKN LEFTBTKN INTVALTKN RIGHTBTKN { save_symbol($1, $2, PRG_GetScope(), "ary"); } ; /* int arreglo[3]; */
+vardeclaration  : type IDTKN { save_symbol($1, $2, PRG_GetScope(), "var"); }
+				| type IDTKN LEFTBTKN INTVALTKN RIGHTBTKN { save_symbol($1, $2, PRG_GetScope(), "ary"); } ; /* int arreglo[3]; */
 
-type   						: INTTKN | DOUBLETKN | STRINGTKN | BOOLTKN;
+type   			: INTTKN | DOUBLETKN | STRINGTKN | BOOLTKN;
 
 
-blockstmts        : blockstmts blockstmt;
-									| blockstmt;
+blockstmts      : blockstmts blockstmt;
+				| blockstmt;
 
-blockstmt         : assignstmt SEMICOLONTKN | ifstmt | iterstmt | iostmt SEMICOLONTKN | callstmt SEMICOLONTKN;
+blockstmt       : assignstmt SEMICOLONTKN | ifstmt | iterstmt | iostmt SEMICOLONTKN | callstmt SEMICOLONTKN;
 
-ifstmt            : IFTKN LEFTPTKN expstmt RIGHTPTKN OPENBLOCKTKN blockstmts ENDIFTKN
- 									| IFTKN LEFTPTKN expstmt RIGHTPTKN OPENBLOCKTKN blockstmts ELSETKN blockstmts ENDIFTKN;
+ifstmt          : IFTKN LEFTPTKN expstmt RIGHTPTKN OPENBLOCKTKN blockstmts ENDIFTKN
+ 				| IFTKN LEFTPTKN expstmt RIGHTPTKN OPENBLOCKTKN blockstmts ELSETKN blockstmts ENDIFTKN;
 
-iterstmt					: WHILETKN LEFTPTKN expstmt RIGHTPTKN OPENBLOCKTKN blockstmts ENDWHILETKN;
+iterstmt		: WHILETKN LEFTPTKN expstmt RIGHTPTKN OPENBLOCKTKN blockstmts ENDWHILETKN;
 
-assignstmt        : IDTKN ASSIGNTKN expstmt { get_symbol($1, PRG_GetScope(), "var"); checkStmt("=", $1, $3); }
-									| IDTKN LEFTBTKN INTVALTKN RIGHTBTKN ASSIGNTKN expstmt  { get_symbol($1, PRG_GetScope(), "ary"); checkStmt("=", $1, $3); };
+assignstmt      : IDTKN ASSIGNTKN expstmt { get_symbol($1, PRG_GetScope(), "var"); SMT_CheckStatement("=", $1); }
+				| IDTKN LEFTBTKN INTVALTKN RIGHTBTKN ASSIGNTKN expstmt  { get_symbol($1, PRG_GetScope(), "ary"); SMT_CheckStatement("=", $1); };
 									
-iostmt            : READTKN var  { get_symbol($2, PRG_GetScope(), "var");}
-									| WRITETKN expstmt;
+iostmt          : READTKN var  { get_symbol($2, PRG_GetScope(), "var");}
+				| WRITETKN expstmt;
 									
-var               : identifier 
-									| identifier LEFTBTKN INTVALTKN RIGHTBTKN;
+var             : identifier 
+				| identifier LEFTBTKN INTVALTKN RIGHTBTKN;
 
-identifier				: IDTKN;
+identifier		: IDTKN;
 			
-expstmt           : expstmt compoperator {pushOperator($2);} exp {checkExp("<>", $1, $4); cg_exp();} 
-									| exp;
+expstmt         : expstmt compoperator { EXP_PushOperator($2); } exp { SMT_CheckExp($2, $1, $4); cg_exp(); } 
+				| exp;
 
-compoperator      : LTTKN | LTETKN | GTTKN | GTETKN | EQUALTKN | NOTEQUALTKN | ORTKN | ANDTKN;
+compoperator    : LTTKN | LTETKN | GTTKN | GTETKN | EQUALTKN | NOTEQUALTKN | ORTKN | ANDTKN;
 
-exp               : exp PLUSTKN {pushOperator("+");} term { checkExp("+", $1, $4); cg_exp();} 
-									| exp MINUSTKN {pushOperator("-");}  term  { checkExp("-", $1, $4); cg_exp();}
-									| term;
+exp             : exp PLUSTKN { EXP_PushOperator($2); } term { SMT_CheckExp($2, $1, $4); cg_exp();} 
+				| exp MINUSTKN { EXP_PushOperator($2); }  term  { SMT_CheckExp($2, $1, $4); cg_exp();}
+				| term;
 
-term    					: term TIMESTKN {pushOperator("*");}  factor  { checkExp("*", $1, $4); cg_exp();}
-									| term DIVTKN {pushOperator("/");} factor  { checkExp("/", $1, $4); cg_exp();}
-									| factor
+term    		: term TIMESTKN { EXP_PushOperator($2); }  factor  { SMT_CheckExp($2, $1, $4); cg_exp();}
+				| term DIVTKN { EXP_PushOperator($2); } factor  { SMT_CheckExp($2, $1, $4); cg_exp();}
+				| factor
 
-values            : INTVALTKN 
-									| DOUBLEVALTKN  
-									| STRINGVALTKN   
-									| TRUETKN  
-									| FALSETKN;
+values          : INTVALTKN 
+				| DOUBLEVALTKN  
+				| STRINGVALTKN   
+				| TRUETKN  
+				| FALSETKN;
 
-factor            : LEFTPTKN { /* Unnecesary to add a fake bottom */ } exp { /* Unnecesary to remove a fake bottom */ } RIGHTPTKN
-									| var  { /* printf("Pushing a var type into typeStack: %s\n", $1); */ get_symbol($1, PRG_GetScope(), "var"); pushType($1, "id"); pushOperand($1, "id"); }
-									| values { /* printf("Pushing constant type into typeStack: %s\n", $1); */ pushType($1, "const"); pushOperand($1, "const"); }
-									| callstmt { /* printf("Pushing function type into typeStack:%s\n", $1); */ pushType($1, "func"); pushOperand($1, "func");} ;
+factor			: LEFTPTKN { /* fake bottom */ } exp { /* fake bottom */ } RIGHTPTKN
+				| var  { EXP_PushOperand($1, "var");  }
+				| values { EXP_PushOperand($1, "const"); }
+				| callstmt { EXP_PushOperand($1, "func");  } ;
 
-//faltaria checar que existen los args_scope									
-callstmt          : IDTKN LEFTPTKN args RIGHTPTKN  { get_symbol($1, "global", "func"); };
+callstmt        : IDTKN LEFTPTKN args RIGHTPTKN  { get_symbol($1, "global", "func"); };
 
 // Me falta la semantica de variables
-args              : /* empty */ | arglist
-arglist           : arglist COMMATKN exp | exp;
+args            : /* empty */ | arglist
+arglist         : arglist COMMATKN exp | exp;
 
-returnstmt        : RETURNFUNCTKN exp SEMICOLONTKN { $$ = $2; };
+returnstmt      : RETURNFUNCTKN exp SEMICOLONTKN { $$ = $2; };
 		
 %%
 

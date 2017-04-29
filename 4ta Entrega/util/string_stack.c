@@ -36,14 +36,16 @@ char * stackTop(stack *s){
 	return s->data[(s->size - 1)];
 }
 
-void stackPush(stack *s, char * data){
-	int indexs;
-	if (s->size < STACK_MAX){
-		indexs = s->size++;
-		if(s->data[indexs]!=NULL){
-			free(s->data[indexs]);
+//REWORK / TO-DO
+//Move this to int. Return 0 on fullstack.
+void stackPush(stack *s, char *data){
+	int i;
+	if (s->size < (STACK_MAX-1)){
+		i = s->size++;
+		if(s->data[i]!=NULL){
+			free(s->data[i]);
 		}
-		s->data[indexs] = strdup(data);
+		s->data[i] = strdup(data);
 	}else
 		fprintf(stderr, "Error: stack full\n");
 }
@@ -56,25 +58,7 @@ char * stackPop(stack *s){
 		return NULL;
 	}
 	
-	//printf("Debug stackPop() s->size = %d\r\n", s->size);
-	//printf("Debug stackPop() s->data = %d\r\n\r\n", s->data[s->size - 1]);
 	char *result = strdup(s->data[--s->size]);
+	//printf("POPPED: %s\n", result);
 	return result;
 }
-
-/*
-int main(){
-	stack platos;
-	
-	stackInit(&platos);
-	stackPush(&platos,2);
-	stackPush(&platos,3);
-	stackPush(&platos,5);
-	stackPop(&platos);
-	stackPop(&platos);
-	stackPop(&platos);
-	stackPop(&platos);
-	
-	return 0;
-}
-*/

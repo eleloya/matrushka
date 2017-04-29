@@ -935,7 +935,7 @@ yylval = strdup("string"); return STRINGTKN;
 case 14:
 YY_RULE_SETUP
 #line 43 "lex.l"
-yylval = strdup("bool"); return BOOLTKN;
+yylval = strdup("boolean"); return BOOLTKN;
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
@@ -955,27 +955,27 @@ yylval = strdup(yytext); return FALSETKN;
 case 18:
 YY_RULE_SETUP
 #line 47 "lex.l"
-return ASSIGNTKN;
+yylval = strdup(yytext); return ASSIGNTKN;
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
 #line 48 "lex.l"
-return PLUSTKN;
+yylval = strdup(yytext); return PLUSTKN;
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
 #line 49 "lex.l"
-return MINUSTKN;
+yylval = strdup(yytext); return MINUSTKN;
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
 #line 50 "lex.l"
-return TIMESTKN;
+yylval = strdup(yytext); return TIMESTKN;
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
 #line 51 "lex.l"
-return DIVTKN;
+yylval = strdup(yytext); return DIVTKN;
 	YY_BREAK
 case 23:
 YY_RULE_SETUP

@@ -225,9 +225,34 @@ void PRG_SetScope(char *scopeName){
 */
 char * PRG_GetScope(){	
 	if(VERBOSE)
-		printf("LINE: %-4d PGR_GetScope()->%s\n", g_lineno, scope);
+		printf("LINE: %-4d PGR_GetScope() -> %s\n", g_lineno, scope);
 	
 	return scope;
+}
+
+/*
+* Used in the grammar rules (expcmp,exp,term,factor) for semantic analysis.
+*
+*/
+void EXP_PushOperator(char *op){
+	//Always checking
+	if (NULL==op){
+		printf("LINE: %-4d  CALL: EXP_PushOperator(NULL)\t", g_lineno);
+		printf("FATAL: Null reference.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	// REWORK / TO-DO
+	// Maybe possible to move this code to some kind of initializer
+	if(operatorStackFirstTime){
+		stackInit(&operatorStack);
+		operatorStackFirstTime = FALSE;
+	}
+	
+	stackPush(&operatorStack,op);
+	
+	if(VERBOSE)
+		printf("LINE: %-4d EXP_PushOperator(%s)\n", g_lineno, op);	
 }
 
 // save_symbol("int","counter","global","var")
@@ -302,43 +327,28 @@ char *getTypeFromValue(char *value){
 	}
 }
 
-void pushType(char *value, char *symbolKind){
-	static int firstTime = TRUE;
-	char *factorType;
-	if(firstTime){
-		stackInit(&typeStack);
-		firstTime = FALSE;
-	}
+char *getTypeFromSymbol(char *symbol){
+	//TO-DO check for nulls on symbol
 	
-	if(strcmp(symbolKind,"const")==0){ // then is a constant
-		factorType = getTypeFromValue(value);
-		//printf("Retrived type for %s is %s\n\n", value, factorType);
-	}else{ // then is a variable or a function
-		factorType = memberType(SymbolTable, value, PRG_GetScope());
-		//printf("Retrived type for %s is %s in scope: %s\n\n", value, factorType, PRG_GetScope());
-	}
-	
-	// We must transform the type into a int because these stack only holds integers
-	stackPush(&typeStack,factorType);
-	//DEBUG
-	//printf("Pushing %d:%s:%s\n", typeDict(factorType), factorType, value);
-	
+	return memberType(SymbolTable, symbol, PRG_GetScope());
 }
 
-void checkStmt(char *st, char *valuea, char *valueb){
+void SMT_CheckStatement(char *st, char *symbol){
+	//TO-DO Check for NULLS
+	char *typeName;
 	
-	pushType(valuea, "var");
+	if(strcmp(st,"return")==0){
+		typeName = symbol;
+	}else{
+		typeName = getTypeFromSymbol(symbol);
+	}
 	
-	//Llego aca?
-	char * a = stackPop(&typeStack);
-  char * b = stackPop(&typeStack);
+	char * returnVal = stackPop(&typeStack);	
+	if(VERBOSE)
+		printf("LINE: %-4d SMT_CheckStatement(%s,%s) // stackPOP(typeStack)=%s  \n", g_lineno, st,symbol, returnVal);
 	
-	//DEBUG
-	//printf("--> Checking statement '%s' for %s:%s\n", st, valuea, valueb);
-	//printf("CHECK(%s) Popped: %d\n",st,a);
-	//printf("CHECK(%s) Popped: %d\n",st,b);
-	
-	if(strcmp(a,b)!=0){
+	//TO-DO Should really abort here. Use previous convention for closing
+	if(strcmp(typeName,returnVal)!=0){
 		if(strcmp(st,"=")==0)
 			yyerror("ERROR: type conflict inside assignment");
 		else
@@ -348,11 +358,17 @@ void checkStmt(char *st, char *valuea, char *valueb){
 		//printf("--> NOISE\n");
 		
 	}
+	
+	
+	if(VERBOSE)
+		printf("LINE: %-4d SMT_CheckStatement(%s,%s)\n", g_lineno, st,symbol);
+	
+	free(returnVal);
 }
 
-void checkExp(char *op, char *valuea, char *valueb){
+void SMT_CheckExp(char *op, char *valuea, char *valueb){
 	char * a = stackPop(&typeStack);
-  char * b = stackPop(&typeStack);
+  	char * b = stackPop(&typeStack);
 	
 	// Aqui deberia tecnicamente hacer un cubo semantico
 	// Verificar que la operacion con los dos tipos es permitida
@@ -360,8 +376,11 @@ void checkExp(char *op, char *valuea, char *valueb){
 	// if operation_permitted(a,b,op);
 	
 	//DEBUG
-	printf("check(%s): %s:%s\n",op,a,valueb);
-	printf("check(%s): %s:%s\n",op,b,valuea);
+	
+	//Estan en orden inverso el stack
+	if(VERBOSE)
+		printf("LINE: %-4d SMT_CheckExp(\"%s\",\"%s\":%s,\"%s\":%s)\n", g_lineno, op, valueb, a, valuea, b);
+
 	
 	if(strcmp(a,b)!=0){
 		yyerror("ERROR: type conflict inside expression");
@@ -390,33 +409,6 @@ void checkAssign(char *a, char *op, char *b){
 	printf("Value of tmp: %s\n", b);
 }
 
-void pushOperator(char *op){
-	// Unfortunely we need to add these to all attributes for expression code_generation
-	if(operatorStackFirstTime){
-		stackInit(&operatorStack);
-		operatorStackFirstTime = FALSE;
-	}
-	
-	stackPush(&operatorStack,op);
-	printf("Pushed: %s to operatorStack\n", op);
-	
-}
-
-void pushOperand(char *operand, char *kind){
-	
-	// I don't know why i'm asking for kind. I guess is important if the operator is of function kind. Time will tell.
-	// It may prove important at code generation time.
-	
-	if(operandStackFirstTime){
-		stackInit(&operandStack);
-		operandStackFirstTime = FALSE;
-	}
-	
-	stackPush(&operandStack, operand);
-	printf("Pushed: %s:%s to operandStack\n", kind,operand);
-	
-}
-
 void cg_exp(){
 	//Si el top de pila de operadores = +, -, *, /, ||, &&, !=, <, <=, >=, > entonces
 	//operador = stackOperadorTOP
@@ -437,7 +429,9 @@ void cg_exp(){
 	//If operand 1 or 2 have temporals, push them back to temporalStack... para hacer reuso de las temporales I GUESS
 	stackPush(&operandStack,resultado);
 	
-	printf("  %3s %-8s %-5s %-5s\n\n",operator, operand1, operand2, resultado);
+	
+	if(VERBOSE)
+		printf("LINE: %-4d EXP_MakeQuadruple(%s,%s,%s,%s)\n", g_lineno, operator,operand1,operand2, resultado);
 	
 	//Creo que aqui deberia haber type-checking o dejarlo en la funcion anterior da igual
 }
@@ -473,6 +467,52 @@ void generateTemporals(){
 	
 }
 
+void pushType(char *value, char *symbolKind){
+	static int firstTime = TRUE;
+	char *factorType;
+	if(firstTime){
+		stackInit(&typeStack);
+		firstTime = FALSE;
+	}
+	
+	if(strcmp(symbolKind,"const")==0){ // then is a constant
+		factorType = getTypeFromValue(value);
+		//printf("Retrived type for %s is %s\n\n", value, factorType);
+	}else{ // then is a variable or a function
+		factorType = memberType(SymbolTable, value, PRG_GetScope());
+		//printf("Retrived type for %s is %s in scope: %s\n\n", value, factorType, PRG_GetScope());
+	}
+	
+	// We must transform the type into a int because these stack only holds integers
+	stackPush(&typeStack,factorType);
+	//DEBUG
+	//printf("Pushing %d:%s:%s\n", typeDict(factorType), factorType, value);
+	
+}
+
+void pushOperand(char *operand, char *kind){
+	if(operandStackFirstTime){
+		stackInit(&operandStack);
+		operandStackFirstTime = FALSE;
+	}
+	stackPush(&operandStack, operand);
+}
+
+void EXP_PushOperand(char *operand, char *symbolKind){
+	//TO-DO Check for NULLS
+	
+	//Check for the existance of such variable before even continuing.
+	if(strcmp(symbolKind,"var")==0)
+		get_symbol(operand, PRG_GetScope(), "var"); 
+	
+	//Later is the same for both expressions
+	pushType(operand, symbolKind); 
+	pushOperand(operand, symbolKind);
+	
+	if(VERBOSE)
+		printf("LINE: %-4d EXP_PushOperand(%s,%s)\n", g_lineno, operand,symbolKind);
+}
+
 
 
 /* Enabling traces.  */
@@ -506,7 +546,7 @@ typedef int YYSTYPE;
 
 
 /* Line 216 of yacc.c.  */
-#line 510 "y.tab.c"
+#line 550 "y.tab.c"
 
 #ifdef short
 # undef short
@@ -824,15 +864,15 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint16 yyrline[] =
 {
-       0,   331,   331,   331,   332,   332,   335,   336,   338,   340,
-     341,   343,   343,   343,   345,   345,   346,   348,   348,   350,
-     351,   353,   356,   357,   359,   360,   362,   362,   362,   362,
-     365,   366,   368,   368,   368,   368,   368,   370,   371,   373,
-     375,   376,   378,   379,   381,   382,   384,   386,   386,   387,
-     389,   389,   389,   389,   389,   389,   389,   389,   391,   391,
-     392,   392,   393,   395,   395,   396,   396,   397,   399,   400,
-     401,   402,   403,   405,   405,   405,   406,   407,   408,   411,
-     414,   414,   415,   415,   417
+       0,   371,   371,   371,   372,   372,   375,   376,   378,   380,
+     381,   383,   383,   383,   385,   385,   386,   388,   388,   390,
+     391,   393,   396,   397,   399,   400,   402,   402,   402,   402,
+     405,   406,   408,   408,   408,   408,   408,   410,   411,   413,
+     415,   416,   418,   419,   421,   422,   424,   426,   426,   427,
+     429,   429,   429,   429,   429,   429,   429,   429,   431,   431,
+     432,   432,   433,   435,   435,   436,   436,   437,   439,   440,
+     441,   442,   443,   445,   445,   445,   446,   447,   448,   450,
+     453,   453,   454,   454,   456
 };
 #endif
 
@@ -1846,148 +1886,148 @@ yyreduce:
   switch (yyn)
     {
         case 2:
-#line 331 "yacc.y"
+#line 371 "yacc.y"
     { generateTemporals();PRG_SetScope("global");  }
     break;
 
   case 3:
-#line 331 "yacc.y"
+#line 371 "yacc.y"
     { print_hash_table(SymbolTable); }
     break;
 
   case 4:
-#line 332 "yacc.y"
+#line 372 "yacc.y"
     { generateTemporals();PRG_SetScope("global");  }
     break;
 
   case 11:
-#line 343 "yacc.y"
+#line 383 "yacc.y"
     {PRG_SetScope((yyvsp[(4) - (4)])); save_symbol((yyvsp[(2) - (4)]), (yyvsp[(4) - (4)]), "global", "func");  }
     break;
 
   case 12:
-#line 343 "yacc.y"
-    { checkStmt("ret", (yyvsp[(4) - (11)]), (yyvsp[(11) - (11)]));}
+#line 383 "yacc.y"
+    { SMT_CheckStatement("return", (yyvsp[(2) - (11)]));}
     break;
 
   case 21:
-#line 353 "yacc.y"
+#line 393 "yacc.y"
     { save_symbol((yyvsp[(1) - (2)]), (yyvsp[(2) - (2)]), PRG_GetScope(), "param"); }
     break;
 
   case 24:
-#line 359 "yacc.y"
+#line 399 "yacc.y"
     { save_symbol((yyvsp[(1) - (2)]), (yyvsp[(2) - (2)]), PRG_GetScope(), "var"); }
     break;
 
   case 25:
-#line 360 "yacc.y"
+#line 400 "yacc.y"
     { save_symbol((yyvsp[(1) - (5)]), (yyvsp[(2) - (5)]), PRG_GetScope(), "ary"); }
     break;
 
   case 40:
-#line 375 "yacc.y"
-    { get_symbol((yyvsp[(1) - (3)]), PRG_GetScope(), "var"); checkStmt("=", (yyvsp[(1) - (3)]), (yyvsp[(3) - (3)])); }
+#line 415 "yacc.y"
+    { get_symbol((yyvsp[(1) - (3)]), PRG_GetScope(), "var"); SMT_CheckStatement("=", (yyvsp[(1) - (3)])); }
     break;
 
   case 41:
-#line 376 "yacc.y"
-    { get_symbol((yyvsp[(1) - (6)]), PRG_GetScope(), "ary"); checkStmt("=", (yyvsp[(1) - (6)]), (yyvsp[(3) - (6)])); }
+#line 416 "yacc.y"
+    { get_symbol((yyvsp[(1) - (6)]), PRG_GetScope(), "ary"); SMT_CheckStatement("=", (yyvsp[(1) - (6)])); }
     break;
 
   case 42:
-#line 378 "yacc.y"
+#line 418 "yacc.y"
     { get_symbol((yyvsp[(2) - (2)]), PRG_GetScope(), "var");}
     break;
 
   case 47:
-#line 386 "yacc.y"
-    {pushOperator((yyvsp[(2) - (2)]));}
+#line 426 "yacc.y"
+    { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 48:
-#line 386 "yacc.y"
-    {checkExp("<>", (yyvsp[(1) - (4)]), (yyvsp[(4) - (4)])); cg_exp();}
+#line 426 "yacc.y"
+    { SMT_CheckExp((yyvsp[(2) - (4)]), (yyvsp[(1) - (4)]), (yyvsp[(4) - (4)])); cg_exp(); }
     break;
 
   case 58:
-#line 391 "yacc.y"
-    {pushOperator("+");}
+#line 431 "yacc.y"
+    { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 59:
-#line 391 "yacc.y"
-    { checkExp("+", (yyvsp[(1) - (4)]), (yyvsp[(4) - (4)])); cg_exp();}
+#line 431 "yacc.y"
+    { SMT_CheckExp((yyvsp[(2) - (4)]), (yyvsp[(1) - (4)]), (yyvsp[(4) - (4)])); cg_exp();}
     break;
 
   case 60:
-#line 392 "yacc.y"
-    {pushOperator("-");}
+#line 432 "yacc.y"
+    { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 61:
-#line 392 "yacc.y"
-    { checkExp("-", (yyvsp[(1) - (4)]), (yyvsp[(4) - (4)])); cg_exp();}
+#line 432 "yacc.y"
+    { SMT_CheckExp((yyvsp[(2) - (4)]), (yyvsp[(1) - (4)]), (yyvsp[(4) - (4)])); cg_exp();}
     break;
 
   case 63:
-#line 395 "yacc.y"
-    {pushOperator("*");}
+#line 435 "yacc.y"
+    { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 64:
-#line 395 "yacc.y"
-    { checkExp("*", (yyvsp[(1) - (4)]), (yyvsp[(4) - (4)])); cg_exp();}
+#line 435 "yacc.y"
+    { SMT_CheckExp((yyvsp[(2) - (4)]), (yyvsp[(1) - (4)]), (yyvsp[(4) - (4)])); cg_exp();}
     break;
 
   case 65:
-#line 396 "yacc.y"
-    {pushOperator("/");}
+#line 436 "yacc.y"
+    { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 66:
-#line 396 "yacc.y"
-    { checkExp("/", (yyvsp[(1) - (4)]), (yyvsp[(4) - (4)])); cg_exp();}
+#line 436 "yacc.y"
+    { SMT_CheckExp((yyvsp[(2) - (4)]), (yyvsp[(1) - (4)]), (yyvsp[(4) - (4)])); cg_exp();}
     break;
 
   case 73:
-#line 405 "yacc.y"
-    { /* Unnecesary to add a fake bottom */ }
+#line 445 "yacc.y"
+    { /* fake bottom */ }
     break;
 
   case 74:
-#line 405 "yacc.y"
-    { /* Unnecesary to remove a fake bottom */ }
+#line 445 "yacc.y"
+    { /* fake bottom */ }
     break;
 
   case 76:
-#line 406 "yacc.y"
-    { /* printf("Pushing a var type into typeStack: %s\n", $1); */ get_symbol((yyvsp[(1) - (1)]), PRG_GetScope(), "var"); pushType((yyvsp[(1) - (1)]), "id"); pushOperand((yyvsp[(1) - (1)]), "id"); }
+#line 446 "yacc.y"
+    { EXP_PushOperand((yyvsp[(1) - (1)]), "var");  }
     break;
 
   case 77:
-#line 407 "yacc.y"
-    { /* printf("Pushing constant type into typeStack: %s\n", $1); */ pushType((yyvsp[(1) - (1)]), "const"); pushOperand((yyvsp[(1) - (1)]), "const"); }
+#line 447 "yacc.y"
+    { EXP_PushOperand((yyvsp[(1) - (1)]), "const"); }
     break;
 
   case 78:
-#line 408 "yacc.y"
-    { /* printf("Pushing function type into typeStack:%s\n", $1); */ pushType((yyvsp[(1) - (1)]), "func"); pushOperand((yyvsp[(1) - (1)]), "func");}
+#line 448 "yacc.y"
+    { EXP_PushOperand((yyvsp[(1) - (1)]), "func");  }
     break;
 
   case 79:
-#line 411 "yacc.y"
+#line 450 "yacc.y"
     { get_symbol((yyvsp[(1) - (4)]), "global", "func"); }
     break;
 
   case 84:
-#line 417 "yacc.y"
+#line 456 "yacc.y"
     { (yyval) = (yyvsp[(2) - (3)]); }
     break;
 
 
 /* Line 1267 of yacc.c.  */
-#line 1991 "y.tab.c"
+#line 2031 "y.tab.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -2201,7 +2241,7 @@ yyreturn:
 }
 
 
-#line 419 "yacc.y"
+#line 458 "yacc.y"
 
 
 
