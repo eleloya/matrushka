@@ -26,7 +26,7 @@ char* concat(char *a,char *b)
 {
     char *result = malloc(strlen(a)+strlen(b)+1); //+1 for the zero-terminator
 		if(NULL==result){
-			printf("Error allocating memory in hashing");
+			printf("Error allocating memory for string concat");
 			exit(1);
 		}
     strcpy(result, a);
@@ -136,17 +136,6 @@ int insert(struct symbol hashtable[], char *typeName, char *identifierName, char
 	return 1;
 }
 
-void print_hash_table(struct symbol hashtable[]){
-	printf("\nSYMBOL TABLE\n");
-	printf("%15s  %10s  ------   -----  -------  ----\n","----------","----------");
-	printf("%15s  %-10s  type     kind   address  key\n","identifier", "context");
-	printf("%15s  %10s  ------   -----  -------  ----\n","----------","----------");
-	
-  for (int i=0; i< SYMBOL_TABLE_SIZE ; i++){
-      if (NULL != hashtable[i].value)
-				printf("%15s  %10s  %7s  %5s  %7d  %d\n", hashtable[i].value, hashtable[i].contextName, hashtable[i].typeName, hashtable[i].symbolKind, hashtable[i].memoryLocation, i);
-  }
-}
 
 void init_hash_table(struct symbol hashtable[]){
 	unsigned int key;

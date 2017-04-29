@@ -18,11 +18,11 @@ endf
 	
 func int:sum(int x, int y):
 	int resulta;
-	if((x+y)>y || true):
-		resulta = x + y;
-	else
-		resulta = x - y;
+	
+	if(test):
+		resulta = 3 + 1 + x * y;	
 	endi
+		
 	return resulta;
 endf
 

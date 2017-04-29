@@ -1,10 +1,12 @@
 %{
 #include "util/string_stack.c"
+#include "util/int_stack.c"
 #include "util/hash.c"
 #define YYPARSER 
 #define YYSTYPE char *
 #define VERBOSE 1	
 #define MAX_TMP_VARIABLES 1024
+#define MAX_PROGRAM_SIZE 1000
 
 /****************************************************************************/
 /**                                                                        **/
@@ -15,13 +17,17 @@
 static stack typeStack;
 static stack operandStack;
 static stack operatorStack;
-static stack temporalStack;
+static int_stack jumpStack;
 static struct symbol SymbolTable[SYMBOL_TABLE_SIZE];
 static char* scope;
+static char* IRCode[MAX_PROGRAM_SIZE]; // TO-DO. Do this structure variable in size.
+
 
 static int operatorStackFirstTime = TRUE;
 static int operandStackFirstTime = TRUE;
-static int g_tcount = 1;
+static int temporals_counter = 1;
+static int program_counter = 0;
+
 
 /****************************************************************************/
 /**                                                                        **/
@@ -82,13 +88,6 @@ void EXP_PushOperator(char *op){
 		printf("FATAL: Null reference.\n");
 		exit(EXIT_FAILURE);
 	}
-
-	// REWORK / TO-DO
-	// Maybe possible to move this code to some kind of initializer
-	if(operatorStackFirstTime){
-		stackInit(&operatorStack);
-		operatorStackFirstTime = FALSE;
-	}
 	
 	stackPush(&operatorStack,op);
 	
@@ -100,13 +99,8 @@ void EXP_PushOperator(char *op){
 // save_symbol("int","counter","global","func")
 // save_symbol("int","counter","global","param")
 void save_symbol(char *typeName, char *identifierName, char *scopeName, char *symbolKind){
-	static int firstTime = TRUE;
 	int response;
-	
-	if(firstTime){
-		init_hash_table(SymbolTable);
-		firstTime = FALSE;
-	}
+
 	response = insert(SymbolTable, typeName, identifierName, scopeName, symbolKind);
 	
 	if(response!=0){
@@ -213,70 +207,122 @@ void checkAssign(char *a, char *op, char *b){
 	printf("Value of tmp: %s\n", b);
 }
 
-void IR_MakeEXP(char *op){
-	//First Semantics
-	char * op_a = stackPop(&typeStack);
-  	char * op_b = stackPop(&typeStack);
+void IR_AddGotoF(char *operand){
+	if(VERBOSE)
+		printf("LINE: %-4d IR_AddGotoF(%s)\n", g_lineno, operand);
+	
+	char *instruction = concat("GOTOF ", operand);
+	IRCode[program_counter] = instruction;
+	int_stackPush(&jumpStack, program_counter);
+	program_counter++;
+}
+
+void IR_AddEXP(char *operator, char *operandA, char *operandB, char *resultado){
+	if(VERBOSE)
+		printf("LINE: %-4d IR_AddEXP(%s,%s,%s,%s)\n", g_lineno, operator,operandA,operandB, resultado);
+	
+	// + OPA OPB T1
+	char * instruction = concat(operator, " ");
+	instruction = concat(instruction, operandA);
+	instruction = concat(instruction, " ");
+	instruction = concat(instruction, operandB);
+	instruction = concat(instruction, " ");
+	instruction = concat(instruction, resultado);
+	
+	IRCode[program_counter] = instruction;
+	program_counter++;
+}
+
+
+void IR_MakeIF(){
+	char *typeName = stackPop(&typeStack);
+	char *operand = stackPop(&operandStack);
 	
 	if(VERBOSE)
-		printf("LINE: %-4d IR_MakeEXP() // Checking Semantics (%s,%s,%s)\n", g_lineno, op, op_a, op_b);
-
+		printf("LINE: %-4d IR_MakeIF()\n", g_lineno);
 	
-	if(strcmp(op_a,op_b)!=0){
-		yyerror("ERROR: type conflict inside expression");
-		//TO-DO Abort here I guess
-		stackPush(&typeStack,"null");
-	}else{
-		// Either one is fine really
-		stackPush(&typeStack,op_a);
-		//stackPush(&typeStack,b);
-		
+	//Semantic Check	
+	if (strcmp(typeName,"boolean")!=0){
+		printf("LINE: %-4d  CALL: IR_MakeIF()\t", g_lineno);
+		printf("FATAL: Returned operand %s:%s is not boolean\n", operand, typeName);
+		exit(EXIT_FAILURE);
 	}
 	
-	//Si el top de pila de operadores = +, -, *, /, ||, &&, !=, <, <=, >=, > entonces
-	//operador = stackOperadorTOP
-	//operando1 = pop stackOperando
-	//operando2 = pop stackOperando
-	//resultado = obtenerVariableTemporalLibre
+	//Code Generation Subroutine
+	IR_AddGotoF(operand);
+}
+
+void IR_MakeENDIF(){
 	
-	//Generar cuadruplo operador operando1 operando2 resultado
-	//Si alguno de los operandoros venia de los temporales, regresarlo
+	int previous_if_address = int_stackPop(&jumpStack);
+	char jmp_address[MAX_PROGRAM_SIZE];
+	
+	char *instruction = IRCode[previous_if_address];
+	sprintf(jmp_address, "%d", program_counter);		
+	
+	char *new_instruction_tmp1;
+	char *new_instruction;
+	
+
+	
+	// "GOTOF var" + " " + JMP_ADDRESS
+	new_instruction_tmp1  = concat(instruction, " ");
+	new_instruction  = concat(new_instruction_tmp1, jmp_address);
+	
+	free(new_instruction_tmp1);
+	free(instruction);
+	
+	IRCode[previous_if_address] = new_instruction;
+}
+
+void IR_MakeEXP(){
+	char *operator = stackPop(&operatorStack);
+	char *operand1_type = stackPop(&typeStack);
+  	char *operand2_type = stackPop(&typeStack);
+	char *operand1 = stackPop(&operandStack);
+	char *operand2 = stackPop(&operandStack);
+	char *temporal_variable;
+	char suffix_for_temporal_variable[MAX_TMP_VARIABLES];
+
+	//Semantic Analysis
+	//We check the type of the two operands with the help of a semantic cube
+	if(VERBOSE)
+		printf("LINE: %-4d IR_MakeEXP() // Checking Semantics (%s,%s,%s)\n", g_lineno, operator, operand1_type, operand2_type);
+	
+	// I need the cubo semantico aqui.
+	// Actualmente solo estoy checando que los operadores sean del mismo tipo.
+	if(strcmp(operand1_type,operand2_type)!=0){
+		printf("LINE: %-4d CALL: IR_MakeEXP(%s)\n", g_lineno, operator);
+		printf("FATAL: Type mismatch between operators \n");
+		exit(EXIT_FAILURE);
+	}else{
+		// Aqui deberia pushear el tipo regresado del cubo semantico realmente
+		// temporal_variable_type
+		stackPush(&typeStack,operand1_type);		
+	}
+	
 	//push pila_de_operandos(resultado)
 	//pop pila-de-operadores
 	
-	char *operator = stackPop(&operatorStack);
-	char *operand1 = stackPop(&operandStack);
-	char *operand2 = stackPop(&operandStack);
-		
+	//Calculate suffix for temporal variable
+	//EJ. T1,T2,T3...T30,T31 ...T122,T123...
+	sprintf(suffix_for_temporal_variable, "%d", temporals_counter++);
+	temporal_variable = concat("T", suffix_for_temporal_variable);
 	
-	char *resultado;
+	//Aqui es donde brilla el cubo semantico chingao. En vez de usar operand1_type.
+	//Guardamos la temporal en la tabla de simbolos.
+	save_symbol(operand1_type, temporal_variable, PRG_GetScope(), "tmp"); 
 	
-	//Calculate suffix
-	char suffix_for_temporal_variable[MAX_TMP_VARIABLES];
-	sprintf(suffix_for_temporal_variable, "%d", g_tcount++);
-	
-	resultado = concat("T", suffix_for_temporal_variable);
-	//Hay que sacar el tipo del resultado de operar 1 en 2. En vez de que sea int vaya
-	save_symbol("int", resultado, PRG_GetScope(), "tmp"); 
+	//Pusheamos al stack de operadores la variable temporal donde se guarda el resultado
+	stackPush(&operandStack,temporal_variable);
 
-	
-	//If operand 1 or 2 have temporals, push them back to temporalStack... para hacer reuso de las temporales I GUESS
-	stackPush(&operandStack,resultado);
-	
-	
-	if(VERBOSE)
-		printf("LINE: %-4d IR_MakeEXP(%s,%s,%s,%s)\n", g_lineno, operator,operand1,operand2, resultado);
-	
-	//Creo que aqui deberia haber type-checking o dejarlo en la funcion anterior da igual
+
+	//Code generation subroutine;
+	IR_AddEXP(operator,operand1,operand2,temporal_variable);
 }
 
 void pushType(char *value, char *symbolKind){
-	static int firstTime = TRUE;
 	char *factorType;
-	if(firstTime){
-		stackInit(&typeStack);
-		firstTime = FALSE;
-	}
 	
 	if(strcmp(symbolKind,"const")==0){ // then is a constant
 		factorType = getTypeFromValue(value);
@@ -288,16 +334,10 @@ void pushType(char *value, char *symbolKind){
 	
 	// We must transform the type into a int because these stack only holds integers
 	stackPush(&typeStack,factorType);
-	//DEBUG
-	//printf("Pushing %d:%s:%s\n", typeDict(factorType), factorType, value);
-	
 }
 
 void pushOperand(char *operand, char *kind){
-	if(operandStackFirstTime){
-		stackInit(&operandStack);
-		operandStackFirstTime = FALSE;
-	}
+	//A lo mejor deberia checar que sea permitido. Pero no pasarian por flex ni bison...
 	stackPush(&operandStack, operand);
 }
 
@@ -316,6 +356,37 @@ void EXP_PushOperand(char *operand, char *symbolKind){
 		printf("LINE: %-4d EXP_PushOperand(%s,%s)\n", g_lineno, operand,symbolKind);
 }
 
+void PRG_Initialize(){
+	PRG_SetScope("global");
+	
+	stackInit(&operandStack);
+	stackInit(&typeStack);
+	stackInit(&operatorStack);
+	int_stackInit(&jumpStack);
+	init_hash_table(SymbolTable);
+	
+	for(int i=0;i<MAX_PROGRAM_SIZE;i++)
+		IRCode[i] = NULL;
+}
+
+void DBG_PrintSymbolTable(struct symbol hashtable[]){
+	printf("\nSYMBOL TABLE\n");
+	printf("%15s  %10s  ------   -----  -------  ----\n","----------","----------");
+	printf("%15s  %-10s  type     kind   address  key\n","identifier", "context");
+	printf("%15s  %10s  ------   -----  -------  ----\n","----------","----------");
+	
+  for (int i=0; i< SYMBOL_TABLE_SIZE ; i++){
+      if (NULL != hashtable[i].value)
+				printf("%15s  %10s  %7s  %5s  %7d  %d\n", hashtable[i].value, hashtable[i].contextName, hashtable[i].typeName, hashtable[i].symbolKind, hashtable[i].memoryLocation, i);
+  }
+}
+
+void DBG_PrintIRCode(){
+	printf("\nIR CODE\n");
+	for(int i=0;i<program_counter;i++)
+		printf("%5d: %s\n",i, IRCode[i]);
+}
+
 %}
 
 //Reserved Words
@@ -332,8 +403,8 @@ void EXP_PushOperand(char *operand, char *symbolKind){
 
 %%
 
-program   		: secrets { PRG_SetScope("global");  }  vardeclarations functions { print_hash_table(SymbolTable); }
-				| secrets { PRG_SetScope("global");  } functions
+program   		: secrets { PRG_Initialize(); }  vardeclarations functions { DBG_PrintSymbolTable(SymbolTable); DBG_PrintIRCode(); }
+				| secrets { PRG_Initialize(); } functions 
 										
 
 secrets			: secrets secret
@@ -371,8 +442,11 @@ blockstmts      : blockstmts blockstmt;
 
 blockstmt       : assignstmt SEMICOLONTKN | ifstmt | iterstmt | iostmt SEMICOLONTKN | callstmt SEMICOLONTKN;
 
-ifstmt          : IFTKN LEFTPTKN expstmt RIGHTPTKN OPENBLOCKTKN blockstmts ENDIFTKN
- 				| IFTKN LEFTPTKN expstmt RIGHTPTKN OPENBLOCKTKN blockstmts ELSETKN blockstmts ENDIFTKN;
+ifstmt          : IFTKN LEFTPTKN expstmt a_openif RIGHTPTKN OPENBLOCKTKN blockstmts ENDIFTKN a_closeif
+ 				| IFTKN LEFTPTKN expstmt a_openif RIGHTPTKN OPENBLOCKTKN blockstmts ELSETKN blockstmts ENDIFTKN;
+
+a_openif		: { IR_MakeIF(); }
+a_closeif		: { IR_MakeENDIF(); }
 
 iterstmt		: WHILETKN LEFTPTKN expstmt RIGHTPTKN OPENBLOCKTKN blockstmts ENDWHILETKN;
 
@@ -387,17 +461,17 @@ var             : identifier
 
 identifier		: IDTKN;
 			
-expstmt         : expstmt compoperator { EXP_PushOperator($2); } exp { IR_MakeEXP($2); } 
+expstmt         : expstmt compoperator { EXP_PushOperator($2); } exp { IR_MakeEXP(); } 
 				| exp;
 
 compoperator    : LTTKN | LTETKN | GTTKN | GTETKN | EQUALTKN | NOTEQUALTKN | ORTKN | ANDTKN;
 
-exp             : exp PLUSTKN { EXP_PushOperator($2); } term { IR_MakeEXP($2);} 
-				| exp MINUSTKN { EXP_PushOperator($2); }  term  { IR_MakeEXP($2);}
+exp             : exp PLUSTKN { EXP_PushOperator($2); } term { IR_MakeEXP();} 
+				| exp MINUSTKN { EXP_PushOperator($2); }  term  { IR_MakeEXP();}
 				| term;
 
-term    		: term TIMESTKN { EXP_PushOperator($2); }  factor  { IR_MakeEXP($2);}
-				| term DIVTKN { EXP_PushOperator($2); } factor  { IR_MakeEXP($2);}
+term    		: term TIMESTKN { EXP_PushOperator($2); }  factor  { IR_MakeEXP();}
+				| term DIVTKN { EXP_PushOperator($2); } factor  { IR_MakeEXP();}
 				| factor
 
 values          : INTVALTKN 
