@@ -6,9 +6,9 @@ A01111663
 #include <string.h>
 
 //Hashes work better if the size is prime
-#define HASH_TABLE_SIZE 2131
+#define SYMBOL_TABLE_SIZE 2131
 
-struct hashrecord{
+struct symbol{
     char *value; //identifierName
 		char *typeName;
 		char *contextName;
@@ -46,12 +46,12 @@ unsigned long hash_key(char *value,char *contextName){
 }
 
 unsigned int hash(char *value, char *contextName, int i){	
-    return (hash_key(value, contextName) + i) % HASH_TABLE_SIZE;
+    return (hash_key(value, contextName) + i) % SYMBOL_TABLE_SIZE;
 }
 
-unsigned int locate(struct hashrecord hashtable[], char *identifierName, char *contextName){
+unsigned int locate(struct symbol hashtable[], char *identifierName, char *contextName){
     unsigned int i,key;
-    for (i=0; i< HASH_TABLE_SIZE ; i++){
+    for (i=0; i< SYMBOL_TABLE_SIZE ; i++){
         key = hash(identifierName, contextName, i);
         if (NULL == hashtable[key].value || strcmp(hashtable[key].value, identifierName) ==0)
 					break;
@@ -59,7 +59,7 @@ unsigned int locate(struct hashrecord hashtable[], char *identifierName, char *c
 	return key;
 }
 
-int member(struct hashrecord hashtable[], char *identifierName, char *contextName){
+int member(struct symbol hashtable[], char *identifierName, char *contextName){
 	unsigned int b = locate(hashtable, identifierName, contextName);
 	
 	if (NULL == hashtable[b].value)
@@ -68,7 +68,7 @@ int member(struct hashrecord hashtable[], char *identifierName, char *contextNam
 		return (strcmp(hashtable[b].value, identifierName)==0);
 }
 
-char * memberKind(struct hashrecord hashtable[], char *identifierName, char *contextName){
+char * memberKind(struct symbol hashtable[], char *identifierName, char *contextName){
 	unsigned int b = locate(hashtable, identifierName, contextName);
 	
 	if (NULL == hashtable[b].value)
@@ -78,7 +78,7 @@ char * memberKind(struct hashrecord hashtable[], char *identifierName, char *con
 }
 
 
-char * memberType(struct hashrecord hashtable[], char *identifierName, char *contextName){
+char * memberType(struct symbol hashtable[], char *identifierName, char *contextName){
 	unsigned int b = locate(hashtable, identifierName, contextName);	
 	if (NULL == hashtable[b].value){
 		 b = locate(hashtable, identifierName, "global");
@@ -91,7 +91,7 @@ char * memberType(struct hashrecord hashtable[], char *identifierName, char *con
 	}
 }
 
-int insert(struct hashrecord hashtable[], char *typeName, char *identifierName, char *contextName, char *symbolKind){
+int insert(struct symbol hashtable[], char *typeName, char *identifierName, char *contextName, char *symbolKind){
 	unsigned int key;	
 	key = locate(hashtable, identifierName, contextName);
 	if (NULL == hashtable[key].value){
@@ -104,21 +104,21 @@ int insert(struct hashrecord hashtable[], char *typeName, char *identifierName, 
 	return 1;
 }
 
-void print_hash_table(struct hashrecord hashtable[]){
+void print_hash_table(struct symbol hashtable[]){
 	printf("\nSYMBOL TABLE\n");
 	printf("%15s  %10s  ------  -----  ----\n","----------","----------");
 	printf("%15s  %-10s  type    kind   key\n","identifier", "context");
 	printf("%15s  %10s  ------  -----  ----\n","----------","----------");
 	
-  for (int i=0; i< HASH_TABLE_SIZE ; i++){
+  for (int i=0; i< SYMBOL_TABLE_SIZE ; i++){
       if (NULL != hashtable[i].value)
 				printf("%15s  %10s  %6s  %5s  %d\n", hashtable[i].value, hashtable[i].contextName, hashtable[i].typeName, hashtable[i].symbolKind, i);
   }
 }
 
-void init_hash_table(struct hashrecord hashtable[]){
+void init_hash_table(struct symbol hashtable[]){
 	unsigned int key;
 	
-	for (key=0; key < HASH_TABLE_SIZE; key++)
+	for (key=0; key < SYMBOL_TABLE_SIZE; key++)
 		hashtable[key].value = NULL;
 }

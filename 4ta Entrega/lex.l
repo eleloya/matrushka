@@ -9,7 +9,7 @@
 #include "y.tab.c"
 
 char lexeme[MAXTOKENLEXEME+1];
-int linecount = 1;
+int g_lineno = 1;
 %}
 %option yylineno
 
@@ -71,7 +71,7 @@ comments \/\/.*
 {identifier} yylval = strdup(yytext); return IDTKN;
 {whitespace} {/* Ignore it */};
 {comments} {/*printf("Commnet: %s\n", yytext);*/ };
-{newline} {linecount++;}
+{newline} {g_lineno++;}
 %%
 
 int yywrap()

@@ -585,7 +585,7 @@ char *yytext;
 #include "y.tab.c"
 
 char lexeme[MAXTOKENLEXEME+1];
-int linecount = 1;
+int g_lineno = 1;
 /* Empezamos con las palabras reservadas */
 /* Seguido de los operadores */
 /* Seguido de los numeros */
@@ -1092,7 +1092,7 @@ case 45:
 /* rule 45 can match eol */
 YY_RULE_SETUP
 #line 74 "lex.l"
-{linecount++;}
+{g_lineno++;}
 	YY_BREAK
 case 46:
 YY_RULE_SETUP

@@ -22,7 +22,7 @@ typedef int Token;
 
 extern FILE* inputFile;
 extern FILE* outputFile;
-extern int linecount;
+extern int g_lineno;
 extern int yyparse(void);
 
 #endif

@@ -1,24 +1,24 @@
 #define STACK_MAX 1024
 
-struct stringStack {
+struct stack {
 	char * data[STACK_MAX];
 	int size;
 };
 
-typedef struct stringStack stringStack;
-void stringStackInit(stringStack *s);
-char * stringStackTop(stringStack *s);
-void stringStackPush(stringStack *s, char *data);
-char * stringStackPop(stringStack *s);
+typedef struct stack stack;
+void stackInit(stack *s);
+char * stackTop(stack *s);
+void stackPush(stack *s, char *data);
+char * stackPop(stack *s);
 
-void stringStackInit(stringStack *s){
+void stackInit(stack *s){
 	s->size=0;
 	for(int i=0;i<STACK_MAX;i++){
 		s->data[i] = NULL;
 	}
 }
 
-void printStringStack(stringStack *s){
+void printStringStack(stack *s){
 	for(int i=0;i<s->size;i++){
 		printf("\t|%10s|","----------");
 		printf("\t|%10s|",s->data[i]);
@@ -27,7 +27,7 @@ void printStringStack(stringStack *s){
 	}
 }
 
-char * stringStackTop(stringStack *s){
+char * stackTop(stack *s){
 	if(s->size==0){
 		fprintf(stderr, "Error: stack empty\n");
 		return NULL;
@@ -36,7 +36,7 @@ char * stringStackTop(stringStack *s){
 	return s->data[(s->size - 1)];
 }
 
-void stringStackPush(stringStack *s, char * data){
+void stackPush(stack *s, char * data){
 	int indexs;
 	if (s->size < STACK_MAX){
 		indexs = s->size++;
@@ -50,7 +50,7 @@ void stringStackPush(stringStack *s, char * data){
 
 //pops an element from the stack
 //it returns the element to the caller.
-char * stringStackPop(stringStack *s){
+char * stackPop(stack *s){
 	if (s->size == 0){
 		fprintf(stderr, "Error: stack empty\n");
 		return NULL;
