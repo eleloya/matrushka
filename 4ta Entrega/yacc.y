@@ -205,50 +205,32 @@ void SMT_CheckStatement(char *st, char *symbol){
 	free(returnVal);
 }
 
-void SMT_CheckExp(char *op, char *valuea, char *valueb){
-	char * a = stackPop(&typeStack);
-  	char * b = stackPop(&typeStack);
-	
-	// Aqui deberia tecnicamente hacer un cubo semantico
-	// Verificar que la operacion con los dos tipos es permitida
-	// Realmente, solo vamos a checar que sean del mismo tipo los dos operadores
-	// if operation_permitted(a,b,op);
-	
-	//DEBUG
-	
-	//Estan en orden inverso el stack
-	if(VERBOSE)
-		printf("LINE: %-4d SMT_CheckExp(\"%s\",\"%s\":%s,\"%s\":%s)\n", g_lineno, op, valueb, a, valuea, b);
-
-	
-	if(strcmp(a,b)!=0){
-		yyerror("ERROR: type conflict inside expression");
-		//DEBUG
-		//printf("Pushing %d:%s:%s\n", -1, valuea, valueb);
-		stackPush(&typeStack,"null");
-	}else{
-		// Either one is fine really
-		stackPush(&typeStack,a);
-		//stackPush(&typeStack,b);
-		
-		//DEBUG
-		//printf("Pushing %d:%s%s%s\n", a, valuea, op, valueb);
-		
-	}
-	
-	
-	
-	//printf("For OP: %s\tOP1:%s\tOP2:%s\r\n\r\n",opDict(op),getTypeFromToken(a),getTypeFromToken(b));
-	//tecnicamente aqui deberia de insertar el resultado de operation_permitted
-}
-
 void checkAssign(char *a, char *op, char *b){
 	printf("Identifier: %s\n", a);
 	printf("Type of (identifier) %s\n", a);
 	printf("Value of tmp: %s\n", b);
 }
 
-void cg_exp(){
+void IR_MakeEXP(char *op){
+	//First Semantics
+	char * op_a = stackPop(&typeStack);
+  	char * op_b = stackPop(&typeStack);
+	
+	if(VERBOSE)
+		printf("LINE: %-4d IR_MakeEXP() // Checking Semantics (%s,%s,%s)\n", g_lineno, op, op_a, op_b);
+
+	
+	if(strcmp(op_a,op_b)!=0){
+		yyerror("ERROR: type conflict inside expression");
+		//TO-DO Abort here I guess
+		stackPush(&typeStack,"null");
+	}else{
+		// Either one is fine really
+		stackPush(&typeStack,op_a);
+		//stackPush(&typeStack,b);
+		
+	}
+	
 	//Si el top de pila de operadores = +, -, *, /, ||, &&, !=, <, <=, >=, > entonces
 	//operador = stackOperadorTOP
 	//operando1 = pop stackOperando
@@ -270,7 +252,7 @@ void cg_exp(){
 	
 	
 	if(VERBOSE)
-		printf("LINE: %-4d EXP_MakeQuadruple(%s,%s,%s,%s)\n", g_lineno, operator,operand1,operand2, resultado);
+		printf("LINE: %-4d IR_MakeEXP(%s,%s,%s,%s)\n", g_lineno, operator,operand1,operand2, resultado);
 	
 	//Creo que aqui deberia haber type-checking o dejarlo en la funcion anterior da igual
 }
@@ -423,17 +405,17 @@ var             : identifier
 
 identifier		: IDTKN;
 			
-expstmt         : expstmt compoperator { EXP_PushOperator($2); } exp { SMT_CheckExp($2, $1, $4); cg_exp(); } 
+expstmt         : expstmt compoperator { EXP_PushOperator($2); } exp { IR_MakeEXP($2); } 
 				| exp;
 
 compoperator    : LTTKN | LTETKN | GTTKN | GTETKN | EQUALTKN | NOTEQUALTKN | ORTKN | ANDTKN;
 
-exp             : exp PLUSTKN { EXP_PushOperator($2); } term { SMT_CheckExp($2, $1, $4); cg_exp();} 
-				| exp MINUSTKN { EXP_PushOperator($2); }  term  { SMT_CheckExp($2, $1, $4); cg_exp();}
+exp             : exp PLUSTKN { EXP_PushOperator($2); } term { IR_MakeEXP($2);} 
+				| exp MINUSTKN { EXP_PushOperator($2); }  term  { IR_MakeEXP($2);}
 				| term;
 
-term    		: term TIMESTKN { EXP_PushOperator($2); }  factor  { SMT_CheckExp($2, $1, $4); cg_exp();}
-				| term DIVTKN { EXP_PushOperator($2); } factor  { SMT_CheckExp($2, $1, $4); cg_exp();}
+term    		: term TIMESTKN { EXP_PushOperator($2); }  factor  { IR_MakeEXP($2);}
+				| term DIVTKN { EXP_PushOperator($2); } factor  { IR_MakeEXP($2);}
 				| factor
 
 values          : INTVALTKN 

@@ -366,50 +366,32 @@ void SMT_CheckStatement(char *st, char *symbol){
 	free(returnVal);
 }
 
-void SMT_CheckExp(char *op, char *valuea, char *valueb){
-	char * a = stackPop(&typeStack);
-  	char * b = stackPop(&typeStack);
-	
-	// Aqui deberia tecnicamente hacer un cubo semantico
-	// Verificar que la operacion con los dos tipos es permitida
-	// Realmente, solo vamos a checar que sean del mismo tipo los dos operadores
-	// if operation_permitted(a,b,op);
-	
-	//DEBUG
-	
-	//Estan en orden inverso el stack
-	if(VERBOSE)
-		printf("LINE: %-4d SMT_CheckExp(\"%s\",\"%s\":%s,\"%s\":%s)\n", g_lineno, op, valueb, a, valuea, b);
-
-	
-	if(strcmp(a,b)!=0){
-		yyerror("ERROR: type conflict inside expression");
-		//DEBUG
-		//printf("Pushing %d:%s:%s\n", -1, valuea, valueb);
-		stackPush(&typeStack,"null");
-	}else{
-		// Either one is fine really
-		stackPush(&typeStack,a);
-		//stackPush(&typeStack,b);
-		
-		//DEBUG
-		//printf("Pushing %d:%s%s%s\n", a, valuea, op, valueb);
-		
-	}
-	
-	
-	
-	//printf("For OP: %s\tOP1:%s\tOP2:%s\r\n\r\n",opDict(op),getTypeFromToken(a),getTypeFromToken(b));
-	//tecnicamente aqui deberia de insertar el resultado de operation_permitted
-}
-
 void checkAssign(char *a, char *op, char *b){
 	printf("Identifier: %s\n", a);
 	printf("Type of (identifier) %s\n", a);
 	printf("Value of tmp: %s\n", b);
 }
 
-void cg_exp(){
+void IR_MakeEXP(char *op){
+	//First Semantics
+	char * op_a = stackPop(&typeStack);
+  	char * op_b = stackPop(&typeStack);
+	
+	if(VERBOSE)
+		printf("LINE: %-4d IR_MakeEXP() // Checking Semantics (%s,%s,%s)\n", g_lineno, op, op_a, op_b);
+
+	
+	if(strcmp(op_a,op_b)!=0){
+		yyerror("ERROR: type conflict inside expression");
+		//TO-DO Abort here I guess
+		stackPush(&typeStack,"null");
+	}else{
+		// Either one is fine really
+		stackPush(&typeStack,op_a);
+		//stackPush(&typeStack,b);
+		
+	}
+	
 	//Si el top de pila de operadores = +, -, *, /, ||, &&, !=, <, <=, >=, > entonces
 	//operador = stackOperadorTOP
 	//operando1 = pop stackOperando
@@ -431,7 +413,7 @@ void cg_exp(){
 	
 	
 	if(VERBOSE)
-		printf("LINE: %-4d EXP_MakeQuadruple(%s,%s,%s,%s)\n", g_lineno, operator,operand1,operand2, resultado);
+		printf("LINE: %-4d IR_MakeEXP(%s,%s,%s,%s)\n", g_lineno, operator,operand1,operand2, resultado);
 	
 	//Creo que aqui deberia haber type-checking o dejarlo en la funcion anterior da igual
 }
@@ -546,7 +528,7 @@ typedef int YYSTYPE;
 
 
 /* Line 216 of yacc.c.  */
-#line 550 "y.tab.c"
+#line 532 "y.tab.c"
 
 #ifdef short
 # undef short
@@ -864,15 +846,15 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint16 yyrline[] =
 {
-       0,   371,   371,   371,   372,   372,   375,   376,   378,   380,
-     381,   383,   383,   383,   385,   385,   386,   388,   388,   390,
-     391,   393,   396,   397,   399,   400,   402,   402,   402,   402,
-     405,   406,   408,   408,   408,   408,   408,   410,   411,   413,
-     415,   416,   418,   419,   421,   422,   424,   426,   426,   427,
-     429,   429,   429,   429,   429,   429,   429,   429,   431,   431,
-     432,   432,   433,   435,   435,   436,   436,   437,   439,   440,
-     441,   442,   443,   445,   445,   445,   446,   447,   448,   450,
-     453,   453,   454,   454,   456
+       0,   353,   353,   353,   354,   354,   357,   358,   360,   362,
+     363,   365,   365,   365,   367,   367,   368,   370,   370,   372,
+     373,   375,   378,   379,   381,   382,   384,   384,   384,   384,
+     387,   388,   390,   390,   390,   390,   390,   392,   393,   395,
+     397,   398,   400,   401,   403,   404,   406,   408,   408,   409,
+     411,   411,   411,   411,   411,   411,   411,   411,   413,   413,
+     414,   414,   415,   417,   417,   418,   418,   419,   421,   422,
+     423,   424,   425,   427,   427,   427,   428,   429,   430,   432,
+     435,   435,   436,   436,   438
 };
 #endif
 
@@ -1886,148 +1868,148 @@ yyreduce:
   switch (yyn)
     {
         case 2:
-#line 371 "yacc.y"
+#line 353 "yacc.y"
     { generateTemporals();PRG_SetScope("global");  }
     break;
 
   case 3:
-#line 371 "yacc.y"
+#line 353 "yacc.y"
     { print_hash_table(SymbolTable); }
     break;
 
   case 4:
-#line 372 "yacc.y"
+#line 354 "yacc.y"
     { generateTemporals();PRG_SetScope("global");  }
     break;
 
   case 11:
-#line 383 "yacc.y"
+#line 365 "yacc.y"
     {PRG_SetScope((yyvsp[(4) - (4)])); save_symbol((yyvsp[(2) - (4)]), (yyvsp[(4) - (4)]), "global", "func");  }
     break;
 
   case 12:
-#line 383 "yacc.y"
+#line 365 "yacc.y"
     { SMT_CheckStatement("return", (yyvsp[(2) - (11)]));}
     break;
 
   case 21:
-#line 393 "yacc.y"
+#line 375 "yacc.y"
     { save_symbol((yyvsp[(1) - (2)]), (yyvsp[(2) - (2)]), PRG_GetScope(), "param"); }
     break;
 
   case 24:
-#line 399 "yacc.y"
+#line 381 "yacc.y"
     { save_symbol((yyvsp[(1) - (2)]), (yyvsp[(2) - (2)]), PRG_GetScope(), "var"); }
     break;
 
   case 25:
-#line 400 "yacc.y"
+#line 382 "yacc.y"
     { save_symbol((yyvsp[(1) - (5)]), (yyvsp[(2) - (5)]), PRG_GetScope(), "ary"); }
     break;
 
   case 40:
-#line 415 "yacc.y"
+#line 397 "yacc.y"
     { get_symbol((yyvsp[(1) - (3)]), PRG_GetScope(), "var"); SMT_CheckStatement("=", (yyvsp[(1) - (3)])); }
     break;
 
   case 41:
-#line 416 "yacc.y"
+#line 398 "yacc.y"
     { get_symbol((yyvsp[(1) - (6)]), PRG_GetScope(), "ary"); SMT_CheckStatement("=", (yyvsp[(1) - (6)])); }
     break;
 
   case 42:
-#line 418 "yacc.y"
+#line 400 "yacc.y"
     { get_symbol((yyvsp[(2) - (2)]), PRG_GetScope(), "var");}
     break;
 
   case 47:
-#line 426 "yacc.y"
+#line 408 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 48:
-#line 426 "yacc.y"
-    { SMT_CheckExp((yyvsp[(2) - (4)]), (yyvsp[(1) - (4)]), (yyvsp[(4) - (4)])); cg_exp(); }
+#line 408 "yacc.y"
+    { IR_MakeEXP((yyvsp[(2) - (4)])); }
     break;
 
   case 58:
-#line 431 "yacc.y"
+#line 413 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 59:
-#line 431 "yacc.y"
-    { SMT_CheckExp((yyvsp[(2) - (4)]), (yyvsp[(1) - (4)]), (yyvsp[(4) - (4)])); cg_exp();}
+#line 413 "yacc.y"
+    { IR_MakeEXP((yyvsp[(2) - (4)]));}
     break;
 
   case 60:
-#line 432 "yacc.y"
+#line 414 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 61:
-#line 432 "yacc.y"
-    { SMT_CheckExp((yyvsp[(2) - (4)]), (yyvsp[(1) - (4)]), (yyvsp[(4) - (4)])); cg_exp();}
+#line 414 "yacc.y"
+    { IR_MakeEXP((yyvsp[(2) - (4)]));}
     break;
 
   case 63:
-#line 435 "yacc.y"
+#line 417 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 64:
-#line 435 "yacc.y"
-    { SMT_CheckExp((yyvsp[(2) - (4)]), (yyvsp[(1) - (4)]), (yyvsp[(4) - (4)])); cg_exp();}
+#line 417 "yacc.y"
+    { IR_MakeEXP((yyvsp[(2) - (4)]));}
     break;
 
   case 65:
-#line 436 "yacc.y"
+#line 418 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 66:
-#line 436 "yacc.y"
-    { SMT_CheckExp((yyvsp[(2) - (4)]), (yyvsp[(1) - (4)]), (yyvsp[(4) - (4)])); cg_exp();}
+#line 418 "yacc.y"
+    { IR_MakeEXP((yyvsp[(2) - (4)]));}
     break;
 
   case 73:
-#line 445 "yacc.y"
+#line 427 "yacc.y"
     { /* fake bottom */ }
     break;
 
   case 74:
-#line 445 "yacc.y"
+#line 427 "yacc.y"
     { /* fake bottom */ }
     break;
 
   case 76:
-#line 446 "yacc.y"
+#line 428 "yacc.y"
     { EXP_PushOperand((yyvsp[(1) - (1)]), "var");  }
     break;
 
   case 77:
-#line 447 "yacc.y"
+#line 429 "yacc.y"
     { EXP_PushOperand((yyvsp[(1) - (1)]), "const"); }
     break;
 
   case 78:
-#line 448 "yacc.y"
+#line 430 "yacc.y"
     { EXP_PushOperand((yyvsp[(1) - (1)]), "func");  }
     break;
 
   case 79:
-#line 450 "yacc.y"
+#line 432 "yacc.y"
     { get_symbol((yyvsp[(1) - (4)]), "global", "func"); }
     break;
 
   case 84:
-#line 456 "yacc.y"
+#line 438 "yacc.y"
     { (yyval) = (yyvsp[(2) - (3)]); }
     break;
 
 
 /* Line 1267 of yacc.c.  */
-#line 2031 "y.tab.c"
+#line 2013 "y.tab.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -2241,7 +2223,7 @@ yyreturn:
 }
 
 
-#line 458 "yacc.y"
+#line 440 "yacc.y"
 
 
 
