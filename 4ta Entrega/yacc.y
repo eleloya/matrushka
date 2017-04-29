@@ -4,6 +4,7 @@
 #define YYPARSER 
 #define YYSTYPE char *
 #define VERBOSE 1	
+#define MAX_TMP_VARIABLES 1024
 
 /****************************************************************************/
 /**                                                                        **/
@@ -20,6 +21,7 @@ static char* scope;
 
 static int operatorStackFirstTime = TRUE;
 static int operandStackFirstTime = TRUE;
+static int g_tcount = 1;
 
 /****************************************************************************/
 /**                                                                        **/
@@ -245,7 +247,18 @@ void IR_MakeEXP(char *op){
 	char *operator = stackPop(&operatorStack);
 	char *operand1 = stackPop(&operandStack);
 	char *operand2 = stackPop(&operandStack);
-	char *resultado = stackPop(&temporalStack);
+		
+	
+	char *resultado;
+	
+	//Calculate suffix
+	char suffix_for_temporal_variable[MAX_TMP_VARIABLES];
+	sprintf(suffix_for_temporal_variable, "%d", g_tcount++);
+	
+	resultado = concat("T", suffix_for_temporal_variable);
+	//Hay que sacar el tipo del resultado de operar 1 en 2. En vez de que sea int vaya
+	save_symbol("int", resultado, PRG_GetScope(), "tmp"); 
+
 	
 	//If operand 1 or 2 have temporals, push them back to temporalStack... para hacer reuso de las temporales I GUESS
 	stackPush(&operandStack,resultado);
@@ -255,37 +268,6 @@ void IR_MakeEXP(char *op){
 		printf("LINE: %-4d IR_MakeEXP(%s,%s,%s,%s)\n", g_lineno, operator,operand1,operand2, resultado);
 	
 	//Creo que aqui deberia haber type-checking o dejarlo en la funcion anterior da igual
-}
-
-void generateTemporals(){
-	stackInit(&temporalStack);
-	// This is just for testing, a proper function is orderly needed.
-	stackPush(&temporalStack,"T25");
-	stackPush(&temporalStack,"T24");
-	stackPush(&temporalStack,"T23");
-	stackPush(&temporalStack,"T22");
-	stackPush(&temporalStack,"T21");
-	stackPush(&temporalStack,"T20");
-	stackPush(&temporalStack,"T19");
-	stackPush(&temporalStack,"T18");
-	stackPush(&temporalStack,"T17");
-	stackPush(&temporalStack,"T16");
-	stackPush(&temporalStack,"T15");
-	stackPush(&temporalStack,"T14");
-	stackPush(&temporalStack,"T13");
-	stackPush(&temporalStack,"T12");
-	stackPush(&temporalStack,"T11");
-	stackPush(&temporalStack,"T10");
-	stackPush(&temporalStack,"T9");
-	stackPush(&temporalStack,"T8");
-	stackPush(&temporalStack,"T7");
-	stackPush(&temporalStack,"T6");
-	stackPush(&temporalStack,"T5");
-	stackPush(&temporalStack,"T4");
-	stackPush(&temporalStack,"T3");
-	stackPush(&temporalStack,"T2");
-	stackPush(&temporalStack,"T1");
-	
 }
 
 void pushType(char *value, char *symbolKind){
@@ -350,8 +332,8 @@ void EXP_PushOperand(char *operand, char *symbolKind){
 
 %%
 
-program   		: secrets { generateTemporals();PRG_SetScope("global");  }  vardeclarations functions { print_hash_table(SymbolTable); }
-				| secrets { generateTemporals();PRG_SetScope("global");  } functions
+program   		: secrets { PRG_SetScope("global");  }  vardeclarations functions { print_hash_table(SymbolTable); }
+				| secrets { PRG_SetScope("global");  } functions
 										
 
 secrets			: secrets secret

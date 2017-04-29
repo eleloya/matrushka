@@ -8,11 +8,17 @@ A01111663
 //Hashes work better if the size is prime
 #define SYMBOL_TABLE_SIZE 2131
 
+int g_intcount = 0;
+int g_doublecount = 0;
+int g_booleancount = 0;
+int g_stringcount = 0;
+
 struct symbol{
     char *value; //identifierName
 		char *typeName;
 		char *contextName;
 		char *symbolKind;
+		int memoryLocation;
 };
 
 //Auxiliary funcion
@@ -35,7 +41,8 @@ unsigned long hash_key(char *value,char *contextName){
 	char *keyString;
 	int len;
 	int i;	
-	keyString = concat(value,contextName);
+	keyString = concat(value,"_");
+	keyString = concat(keyString,contextName);
 	
 	len = strlen(keyString);	
 	for(i = 0; i < len; i++){
@@ -91,14 +98,39 @@ char * memberType(struct symbol hashtable[], char *identifierName, char *context
 	}
 }
 
+int generateAddress(char *typeName){
+	//TO-DO Check for NULLS on symbolKind
+	
+	//Check for boundaries. If it overlaps stop execution
+	
+	int offset = 0;
+	if(strcmp(typeName,"int")==0){
+		offset = 1000 + (4*g_intcount++);
+	}
+	if(strcmp(typeName,"double")==0){
+		offset = 2000 + (8*g_doublecount++);
+	}
+	if(strcmp(typeName,"boolean")==0){
+		offset = 3000 + (8*g_booleancount++);	
+	}
+	if(strcmp(typeName,"string")==0){
+		offset = 4000 + (140*g_stringcount++); // Just like twitter :p
+	}
+	
+	return offset;
+}
+
 int insert(struct symbol hashtable[], char *typeName, char *identifierName, char *contextName, char *symbolKind){
 	unsigned int key;	
+	int address = generateAddress(typeName);
 	key = locate(hashtable, identifierName, contextName);
+	
 	if (NULL == hashtable[key].value){
 		hashtable[key].value = strdup(identifierName);
 		hashtable[key].contextName = strdup(contextName);
 		hashtable[key].typeName = strdup(typeName);
 		hashtable[key].symbolKind =  strdup(symbolKind);
+		hashtable[key].memoryLocation = address;
 		return 0;
 	}	
 	return 1;
@@ -106,13 +138,13 @@ int insert(struct symbol hashtable[], char *typeName, char *identifierName, char
 
 void print_hash_table(struct symbol hashtable[]){
 	printf("\nSYMBOL TABLE\n");
-	printf("%15s  %10s  ------  -----  ----\n","----------","----------");
-	printf("%15s  %-10s  type    kind   key\n","identifier", "context");
-	printf("%15s  %10s  ------  -----  ----\n","----------","----------");
+	printf("%15s  %10s  ------   -----  -------  ----\n","----------","----------");
+	printf("%15s  %-10s  type     kind   address  key\n","identifier", "context");
+	printf("%15s  %10s  ------   -----  -------  ----\n","----------","----------");
 	
   for (int i=0; i< SYMBOL_TABLE_SIZE ; i++){
       if (NULL != hashtable[i].value)
-				printf("%15s  %10s  %6s  %5s  %d\n", hashtable[i].value, hashtable[i].contextName, hashtable[i].typeName, hashtable[i].symbolKind, i);
+				printf("%15s  %10s  %7s  %5s  %7d  %d\n", hashtable[i].value, hashtable[i].contextName, hashtable[i].typeName, hashtable[i].symbolKind, hashtable[i].memoryLocation, i);
   }
 }
 

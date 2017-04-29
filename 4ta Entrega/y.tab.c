@@ -165,6 +165,7 @@
 #define YYPARSER 
 #define YYSTYPE char *
 #define VERBOSE 1	
+#define MAX_TMP_VARIABLES 1024
 
 /****************************************************************************/
 /**                                                                        **/
@@ -181,6 +182,7 @@ static char* scope;
 
 static int operatorStackFirstTime = TRUE;
 static int operandStackFirstTime = TRUE;
+static int g_tcount = 1;
 
 /****************************************************************************/
 /**                                                                        **/
@@ -406,7 +408,18 @@ void IR_MakeEXP(char *op){
 	char *operator = stackPop(&operatorStack);
 	char *operand1 = stackPop(&operandStack);
 	char *operand2 = stackPop(&operandStack);
-	char *resultado = stackPop(&temporalStack);
+		
+	
+	char *resultado;
+	
+	//Calculate suffix
+	char suffix_for_temporal_variable[MAX_TMP_VARIABLES];
+	sprintf(suffix_for_temporal_variable, "%d", g_tcount++);
+	
+	resultado = concat("T", suffix_for_temporal_variable);
+	//Hay que sacar el tipo del resultado de operar 1 en 2. En vez de que sea int vaya
+	save_symbol("int", resultado, PRG_GetScope(), "tmp"); 
+
 	
 	//If operand 1 or 2 have temporals, push them back to temporalStack... para hacer reuso de las temporales I GUESS
 	stackPush(&operandStack,resultado);
@@ -416,37 +429,6 @@ void IR_MakeEXP(char *op){
 		printf("LINE: %-4d IR_MakeEXP(%s,%s,%s,%s)\n", g_lineno, operator,operand1,operand2, resultado);
 	
 	//Creo que aqui deberia haber type-checking o dejarlo en la funcion anterior da igual
-}
-
-void generateTemporals(){
-	stackInit(&temporalStack);
-	// This is just for testing, a proper function is orderly needed.
-	stackPush(&temporalStack,"T25");
-	stackPush(&temporalStack,"T24");
-	stackPush(&temporalStack,"T23");
-	stackPush(&temporalStack,"T22");
-	stackPush(&temporalStack,"T21");
-	stackPush(&temporalStack,"T20");
-	stackPush(&temporalStack,"T19");
-	stackPush(&temporalStack,"T18");
-	stackPush(&temporalStack,"T17");
-	stackPush(&temporalStack,"T16");
-	stackPush(&temporalStack,"T15");
-	stackPush(&temporalStack,"T14");
-	stackPush(&temporalStack,"T13");
-	stackPush(&temporalStack,"T12");
-	stackPush(&temporalStack,"T11");
-	stackPush(&temporalStack,"T10");
-	stackPush(&temporalStack,"T9");
-	stackPush(&temporalStack,"T8");
-	stackPush(&temporalStack,"T7");
-	stackPush(&temporalStack,"T6");
-	stackPush(&temporalStack,"T5");
-	stackPush(&temporalStack,"T4");
-	stackPush(&temporalStack,"T3");
-	stackPush(&temporalStack,"T2");
-	stackPush(&temporalStack,"T1");
-	
 }
 
 void pushType(char *value, char *symbolKind){
@@ -528,7 +510,7 @@ typedef int YYSTYPE;
 
 
 /* Line 216 of yacc.c.  */
-#line 532 "y.tab.c"
+#line 514 "y.tab.c"
 
 #ifdef short
 # undef short
@@ -846,15 +828,15 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint16 yyrline[] =
 {
-       0,   353,   353,   353,   354,   354,   357,   358,   360,   362,
-     363,   365,   365,   365,   367,   367,   368,   370,   370,   372,
-     373,   375,   378,   379,   381,   382,   384,   384,   384,   384,
-     387,   388,   390,   390,   390,   390,   390,   392,   393,   395,
-     397,   398,   400,   401,   403,   404,   406,   408,   408,   409,
-     411,   411,   411,   411,   411,   411,   411,   411,   413,   413,
-     414,   414,   415,   417,   417,   418,   418,   419,   421,   422,
-     423,   424,   425,   427,   427,   427,   428,   429,   430,   432,
-     435,   435,   436,   436,   438
+       0,   335,   335,   335,   336,   336,   339,   340,   342,   344,
+     345,   347,   347,   347,   349,   349,   350,   352,   352,   354,
+     355,   357,   360,   361,   363,   364,   366,   366,   366,   366,
+     369,   370,   372,   372,   372,   372,   372,   374,   375,   377,
+     379,   380,   382,   383,   385,   386,   388,   390,   390,   391,
+     393,   393,   393,   393,   393,   393,   393,   393,   395,   395,
+     396,   396,   397,   399,   399,   400,   400,   401,   403,   404,
+     405,   406,   407,   409,   409,   409,   410,   411,   412,   414,
+     417,   417,   418,   418,   420
 };
 #endif
 
@@ -1868,148 +1850,148 @@ yyreduce:
   switch (yyn)
     {
         case 2:
-#line 353 "yacc.y"
-    { generateTemporals();PRG_SetScope("global");  }
+#line 335 "yacc.y"
+    { PRG_SetScope("global");  }
     break;
 
   case 3:
-#line 353 "yacc.y"
+#line 335 "yacc.y"
     { print_hash_table(SymbolTable); }
     break;
 
   case 4:
-#line 354 "yacc.y"
-    { generateTemporals();PRG_SetScope("global");  }
+#line 336 "yacc.y"
+    { PRG_SetScope("global");  }
     break;
 
   case 11:
-#line 365 "yacc.y"
+#line 347 "yacc.y"
     {PRG_SetScope((yyvsp[(4) - (4)])); save_symbol((yyvsp[(2) - (4)]), (yyvsp[(4) - (4)]), "global", "func");  }
     break;
 
   case 12:
-#line 365 "yacc.y"
+#line 347 "yacc.y"
     { SMT_CheckStatement("return", (yyvsp[(2) - (11)]));}
     break;
 
   case 21:
-#line 375 "yacc.y"
+#line 357 "yacc.y"
     { save_symbol((yyvsp[(1) - (2)]), (yyvsp[(2) - (2)]), PRG_GetScope(), "param"); }
     break;
 
   case 24:
-#line 381 "yacc.y"
+#line 363 "yacc.y"
     { save_symbol((yyvsp[(1) - (2)]), (yyvsp[(2) - (2)]), PRG_GetScope(), "var"); }
     break;
 
   case 25:
-#line 382 "yacc.y"
+#line 364 "yacc.y"
     { save_symbol((yyvsp[(1) - (5)]), (yyvsp[(2) - (5)]), PRG_GetScope(), "ary"); }
     break;
 
   case 40:
-#line 397 "yacc.y"
+#line 379 "yacc.y"
     { get_symbol((yyvsp[(1) - (3)]), PRG_GetScope(), "var"); SMT_CheckStatement("=", (yyvsp[(1) - (3)])); }
     break;
 
   case 41:
-#line 398 "yacc.y"
+#line 380 "yacc.y"
     { get_symbol((yyvsp[(1) - (6)]), PRG_GetScope(), "ary"); SMT_CheckStatement("=", (yyvsp[(1) - (6)])); }
     break;
 
   case 42:
-#line 400 "yacc.y"
+#line 382 "yacc.y"
     { get_symbol((yyvsp[(2) - (2)]), PRG_GetScope(), "var");}
     break;
 
   case 47:
-#line 408 "yacc.y"
+#line 390 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 48:
-#line 408 "yacc.y"
+#line 390 "yacc.y"
     { IR_MakeEXP((yyvsp[(2) - (4)])); }
     break;
 
   case 58:
-#line 413 "yacc.y"
+#line 395 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 59:
-#line 413 "yacc.y"
+#line 395 "yacc.y"
     { IR_MakeEXP((yyvsp[(2) - (4)]));}
     break;
 
   case 60:
-#line 414 "yacc.y"
+#line 396 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 61:
-#line 414 "yacc.y"
+#line 396 "yacc.y"
     { IR_MakeEXP((yyvsp[(2) - (4)]));}
     break;
 
   case 63:
-#line 417 "yacc.y"
+#line 399 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 64:
-#line 417 "yacc.y"
+#line 399 "yacc.y"
     { IR_MakeEXP((yyvsp[(2) - (4)]));}
     break;
 
   case 65:
-#line 418 "yacc.y"
+#line 400 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 66:
-#line 418 "yacc.y"
+#line 400 "yacc.y"
     { IR_MakeEXP((yyvsp[(2) - (4)]));}
     break;
 
   case 73:
-#line 427 "yacc.y"
+#line 409 "yacc.y"
     { /* fake bottom */ }
     break;
 
   case 74:
-#line 427 "yacc.y"
+#line 409 "yacc.y"
     { /* fake bottom */ }
     break;
 
   case 76:
-#line 428 "yacc.y"
+#line 410 "yacc.y"
     { EXP_PushOperand((yyvsp[(1) - (1)]), "var");  }
     break;
 
   case 77:
-#line 429 "yacc.y"
+#line 411 "yacc.y"
     { EXP_PushOperand((yyvsp[(1) - (1)]), "const"); }
     break;
 
   case 78:
-#line 430 "yacc.y"
+#line 412 "yacc.y"
     { EXP_PushOperand((yyvsp[(1) - (1)]), "func");  }
     break;
 
   case 79:
-#line 432 "yacc.y"
+#line 414 "yacc.y"
     { get_symbol((yyvsp[(1) - (4)]), "global", "func"); }
     break;
 
   case 84:
-#line 438 "yacc.y"
+#line 420 "yacc.y"
     { (yyval) = (yyvsp[(2) - (3)]); }
     break;
 
 
 /* Line 1267 of yacc.c.  */
-#line 2013 "y.tab.c"
+#line 1995 "y.tab.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -2223,7 +2205,7 @@ yyreturn:
 }
 
 
-#line 440 "yacc.y"
+#line 422 "yacc.y"
 
 
 
