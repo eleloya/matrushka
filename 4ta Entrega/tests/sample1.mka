@@ -1,13 +1,13 @@
+int a;
+
 func int:suma(int param1,int param2):
 	int ba[3];
-	otra(1)
+	a = 1;
 	return a;
 endf
 
-matrushka("aes256","pass1"):
-  matrushka("swordfish","pass2"):
-		message << "Tarjeta debito";
-		message << "el pin es: ";
-		message << suma(4244, 2);
-	endm
-endm
+func int:main():
+		write "Tarjeta debito";
+		write "el pin es: ";
+		write suma(4244, 2);
+endf

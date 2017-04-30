@@ -19,7 +19,7 @@ endf
 func int:sum(int x, int y):
 	int resulta;
 	
-	if(test):
+	if(true):
 		resulta = 3 + 1 + x * y;	
 	endi
 		
@@ -44,5 +44,8 @@ func int:main():
 	
 	read tmp;
 	write "lero" + "lero";
+	write 0;
+	write true;
+	write 4.3;
 	return 3;
 endf

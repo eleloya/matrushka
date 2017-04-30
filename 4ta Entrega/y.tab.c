@@ -394,6 +394,114 @@ void IR_AddEXP(char *operator, char *operandA, char *operandB, char *resultado){
 	program_counter++;
 }
 
+void IR_AddASSIGN(char *identifier, char *expression){
+	if(VERBOSE)
+		printf("LINE: %-4d IR_AddASSIGN(%s,%s)\n", g_lineno, identifier,expression);
+	// "= " + expression + " " + identifier
+	// = T1 A
+	char * instruction = concat("= ", expression);
+	instruction = concat(instruction, " ");
+	instruction = concat(instruction, identifier);
+	
+	IRCode[program_counter] = instruction;
+	program_counter++;
+}
+
+void IR_AddIOREAD(char * identifier){
+	char *identifier_type;
+	char *instruction;
+	
+	if(VERBOSE)
+		printf("LINE: %-4d IR_AddIOREAD(%s)\n", g_lineno, identifier);
+	//The intermiadiate opcode on the other hand would probably need to be special for each kind of variable
+	identifier_type = getTypeFromSymbol(identifier);
+	
+	if(strcmp(identifier_type,"int")==0){
+		instruction = concat("iread ", identifier);
+	}else if(strcmp(identifier_type,"double")==0){
+		instruction = concat("dread ", identifier);
+	}else if(strcmp(identifier_type,"boolean")==0){
+		instruction = concat("bread ", identifier);
+	}else if(strcmp(identifier_type,"string")==0){
+		instruction = concat("sread ", identifier);
+	}
+	
+	IRCode[program_counter] = instruction;
+	program_counter++;
+}
+
+void IR_MakeIOWRITE(){
+	char *expression_type;
+	char *expression;
+	char *instruction;
+	
+	//Semantic Check
+	//nada, cero, nothing, no needed
+	expression_type = stackPop(&typeStack);
+	expression = stackPop(&operandStack);
+	
+	if(VERBOSE)
+		printf("LINE: %-4d IR_MakeIOWRITE(%s)\n", g_lineno, expression);
+	
+	
+	//I will not make a IR_AddIOWRITE. I can keep it here just fine.
+	if(strcmp(expression_type,"int")==0){
+		instruction = concat("iwrite ", expression);
+	}else if(strcmp(expression_type,"double")==0){
+		instruction = concat("dwrite ", expression);
+	}else if(strcmp(expression_type,"boolean")==0){
+		instruction = concat("bwrite ", expression);
+	}else if(strcmp(expression_type,"string")==0){
+		instruction = concat("swrite ", expression);
+	}
+	
+	IRCode[program_counter] = instruction;
+	program_counter++;
+}
+
+void IR_MakeIOREAD(char *identifier){
+	if(VERBOSE)
+		printf("LINE: %-4d IR_MakeIOREAD(%s)\n", g_lineno, identifier);	
+	
+	//Semantic Check
+	//Look for the identifier to be declared previously in the symbol table
+	//Otherwise were would we save what we read
+	//This is an easy one, is it not? ;)
+	get_symbol(identifier, PRG_GetScope(), "var"); 
+	
+	
+	IR_AddIOREAD(identifier);
+}
+
+void IR_MakeASSIGN(char *identifier){
+	char *identifier_type;
+	char *expression_type;
+	char *expression;
+	
+	//Semantic Check
+	//Look for the identifier to be declared previously in the symbol table
+	//In assignment. The symbol to look for is either a var, or a parameter.
+	get_symbol(identifier, PRG_GetScope(), "var"); 
+	
+	//Semantic Check
+	// Check that the identifier and the expression have the same type
+	identifier_type = getTypeFromSymbol(identifier);
+	expression_type = stackPop(&typeStack);
+	
+	if(strcmp(identifier_type,expression_type)!=0){
+		printf("LINE: %-4d CALL: IR_MakeASSIGN(%s)\n", g_lineno, identifier);
+		printf("FATAL: Type mismatch. Trying to assign %s to a \"%s\" of type %s \n", expression_type, identifier, identifier_type);
+		exit(EXIT_FAILURE);
+	}
+	
+	if(VERBOSE)
+		printf("LINE: %-4d IR_MakeASSIGN(%s)\n", g_lineno, identifier);
+	
+	expression = stackPop(&operandStack);
+	//Code generation
+	IR_AddASSIGN(identifier,expression);
+}
+
 
 void IR_MakeIF(){
 	char *typeName = stackPop(&typeStack);
@@ -517,6 +625,8 @@ void EXP_PushOperand(char *operand, char *symbolKind){
 		printf("LINE: %-4d EXP_PushOperand(%s,%s)\n", g_lineno, operand,symbolKind);
 }
 
+
+
 void PRG_Initialize(){
 	PRG_SetScope("global");
 	
@@ -581,7 +691,7 @@ typedef int YYSTYPE;
 
 
 /* Line 216 of yacc.c.  */
-#line 585 "y.tab.c"
+#line 695 "y.tab.c"
 
 #ifdef short
 # undef short
@@ -899,15 +1009,15 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint16 yyrline[] =
 {
-       0,   406,   406,   406,   407,   407,   410,   411,   413,   415,
-     416,   418,   418,   418,   420,   420,   421,   423,   423,   425,
-     426,   428,   431,   432,   434,   435,   437,   437,   437,   437,
-     440,   441,   443,   443,   443,   443,   443,   445,   446,   448,
-     449,   451,   453,   454,   456,   457,   459,   460,   462,   464,
-     464,   465,   467,   467,   467,   467,   467,   467,   467,   467,
-     469,   469,   470,   470,   471,   473,   473,   474,   474,   475,
-     477,   478,   479,   480,   481,   483,   483,   483,   484,   485,
-     486,   488,   491,   491,   492,   492,   494
+       0,   516,   516,   516,   517,   517,   520,   521,   523,   525,
+     526,   528,   528,   528,   530,   530,   531,   533,   533,   535,
+     536,   538,   541,   542,   544,   545,   547,   547,   547,   547,
+     550,   551,   553,   553,   553,   553,   553,   555,   556,   558,
+     559,   561,   563,   564,   566,   567,   569,   570,   572,   574,
+     574,   575,   577,   577,   577,   577,   577,   577,   577,   577,
+     579,   579,   580,   580,   581,   583,   583,   584,   584,   585,
+     587,   588,   589,   590,   591,   593,   593,   593,   594,   595,
+     596,   598,   601,   601,   602,   602,   604
 };
 #endif
 
@@ -1919,158 +2029,153 @@ yyreduce:
   switch (yyn)
     {
         case 2:
-#line 406 "yacc.y"
+#line 516 "yacc.y"
     { PRG_Initialize(); }
     break;
 
   case 3:
-#line 406 "yacc.y"
+#line 516 "yacc.y"
     { DBG_PrintSymbolTable(SymbolTable); DBG_PrintIRCode(); }
     break;
 
   case 4:
-#line 407 "yacc.y"
+#line 517 "yacc.y"
     { PRG_Initialize(); }
     break;
 
   case 11:
-#line 418 "yacc.y"
+#line 528 "yacc.y"
     {PRG_SetScope((yyvsp[(4) - (4)])); save_symbol((yyvsp[(2) - (4)]), (yyvsp[(4) - (4)]), "global", "func");  }
     break;
 
   case 12:
-#line 418 "yacc.y"
+#line 528 "yacc.y"
     { SMT_CheckStatement("return", (yyvsp[(2) - (11)]));}
     break;
 
   case 21:
-#line 428 "yacc.y"
+#line 538 "yacc.y"
     { save_symbol((yyvsp[(1) - (2)]), (yyvsp[(2) - (2)]), PRG_GetScope(), "param"); }
     break;
 
   case 24:
-#line 434 "yacc.y"
+#line 544 "yacc.y"
     { save_symbol((yyvsp[(1) - (2)]), (yyvsp[(2) - (2)]), PRG_GetScope(), "var"); }
     break;
 
-  case 25:
-#line 435 "yacc.y"
-    { save_symbol((yyvsp[(1) - (5)]), (yyvsp[(2) - (5)]), PRG_GetScope(), "ary"); }
-    break;
-
   case 39:
-#line 448 "yacc.y"
+#line 558 "yacc.y"
     { IR_MakeIF(); }
     break;
 
   case 40:
-#line 449 "yacc.y"
+#line 559 "yacc.y"
     { IR_MakeENDIF(); }
     break;
 
   case 42:
-#line 453 "yacc.y"
-    { get_symbol((yyvsp[(1) - (3)]), PRG_GetScope(), "var"); SMT_CheckStatement("=", (yyvsp[(1) - (3)])); }
-    break;
-
-  case 43:
-#line 454 "yacc.y"
-    { get_symbol((yyvsp[(1) - (6)]), PRG_GetScope(), "ary"); SMT_CheckStatement("=", (yyvsp[(1) - (6)])); }
+#line 563 "yacc.y"
+    { IR_MakeASSIGN((yyvsp[(1) - (3)])); }
     break;
 
   case 44:
-#line 456 "yacc.y"
-    { get_symbol((yyvsp[(2) - (2)]), PRG_GetScope(), "var");}
+#line 566 "yacc.y"
+    { IR_MakeIOREAD((yyvsp[(2) - (2)])); }
+    break;
+
+  case 45:
+#line 567 "yacc.y"
+    {IR_MakeIOWRITE(); }
     break;
 
   case 49:
-#line 464 "yacc.y"
+#line 574 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 50:
-#line 464 "yacc.y"
+#line 574 "yacc.y"
     { IR_MakeEXP(); }
     break;
 
   case 60:
-#line 469 "yacc.y"
+#line 579 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 61:
-#line 469 "yacc.y"
+#line 579 "yacc.y"
     { IR_MakeEXP();}
     break;
 
   case 62:
-#line 470 "yacc.y"
+#line 580 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 63:
-#line 470 "yacc.y"
+#line 580 "yacc.y"
     { IR_MakeEXP();}
     break;
 
   case 65:
-#line 473 "yacc.y"
+#line 583 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 66:
-#line 473 "yacc.y"
+#line 583 "yacc.y"
     { IR_MakeEXP();}
     break;
 
   case 67:
-#line 474 "yacc.y"
+#line 584 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 68:
-#line 474 "yacc.y"
+#line 584 "yacc.y"
     { IR_MakeEXP();}
     break;
 
   case 75:
-#line 483 "yacc.y"
+#line 593 "yacc.y"
     { /* fake bottom */ }
     break;
 
   case 76:
-#line 483 "yacc.y"
+#line 593 "yacc.y"
     { /* fake bottom */ }
     break;
 
   case 78:
-#line 484 "yacc.y"
+#line 594 "yacc.y"
     { EXP_PushOperand((yyvsp[(1) - (1)]), "var");  }
     break;
 
   case 79:
-#line 485 "yacc.y"
+#line 595 "yacc.y"
     { EXP_PushOperand((yyvsp[(1) - (1)]), "const"); }
     break;
 
   case 80:
-#line 486 "yacc.y"
+#line 596 "yacc.y"
     { EXP_PushOperand((yyvsp[(1) - (1)]), "func");  }
     break;
 
   case 81:
-#line 488 "yacc.y"
+#line 598 "yacc.y"
     { get_symbol((yyvsp[(1) - (4)]), "global", "func"); }
     break;
 
   case 86:
-#line 494 "yacc.y"
+#line 604 "yacc.y"
     { (yyval) = (yyvsp[(2) - (3)]); }
     break;
 
 
 /* Line 1267 of yacc.c.  */
-#line 2074 "y.tab.c"
+#line 2179 "y.tab.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -2284,7 +2389,7 @@ yyreturn:
 }
 
 
-#line 496 "yacc.y"
+#line 606 "yacc.y"
 
 
 

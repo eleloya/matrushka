@@ -233,6 +233,114 @@ void IR_AddEXP(char *operator, char *operandA, char *operandB, char *resultado){
 	program_counter++;
 }
 
+void IR_AddASSIGN(char *identifier, char *expression){
+	if(VERBOSE)
+		printf("LINE: %-4d IR_AddASSIGN(%s,%s)\n", g_lineno, identifier,expression);
+	// "= " + expression + " " + identifier
+	// = T1 A
+	char * instruction = concat("= ", expression);
+	instruction = concat(instruction, " ");
+	instruction = concat(instruction, identifier);
+	
+	IRCode[program_counter] = instruction;
+	program_counter++;
+}
+
+void IR_AddIOREAD(char * identifier){
+	char *identifier_type;
+	char *instruction;
+	
+	if(VERBOSE)
+		printf("LINE: %-4d IR_AddIOREAD(%s)\n", g_lineno, identifier);
+	//The intermiadiate opcode on the other hand would probably need to be special for each kind of variable
+	identifier_type = getTypeFromSymbol(identifier);
+	
+	if(strcmp(identifier_type,"int")==0){
+		instruction = concat("iread ", identifier);
+	}else if(strcmp(identifier_type,"double")==0){
+		instruction = concat("dread ", identifier);
+	}else if(strcmp(identifier_type,"boolean")==0){
+		instruction = concat("bread ", identifier);
+	}else if(strcmp(identifier_type,"string")==0){
+		instruction = concat("sread ", identifier);
+	}
+	
+	IRCode[program_counter] = instruction;
+	program_counter++;
+}
+
+void IR_MakeIOWRITE(){
+	char *expression_type;
+	char *expression;
+	char *instruction;
+	
+	//Semantic Check
+	//nada, cero, nothing, no needed
+	expression_type = stackPop(&typeStack);
+	expression = stackPop(&operandStack);
+	
+	if(VERBOSE)
+		printf("LINE: %-4d IR_MakeIOWRITE(%s)\n", g_lineno, expression);
+	
+	
+	//I will not make a IR_AddIOWRITE. I can keep it here just fine.
+	if(strcmp(expression_type,"int")==0){
+		instruction = concat("iwrite ", expression);
+	}else if(strcmp(expression_type,"double")==0){
+		instruction = concat("dwrite ", expression);
+	}else if(strcmp(expression_type,"boolean")==0){
+		instruction = concat("bwrite ", expression);
+	}else if(strcmp(expression_type,"string")==0){
+		instruction = concat("swrite ", expression);
+	}
+	
+	IRCode[program_counter] = instruction;
+	program_counter++;
+}
+
+void IR_MakeIOREAD(char *identifier){
+	if(VERBOSE)
+		printf("LINE: %-4d IR_MakeIOREAD(%s)\n", g_lineno, identifier);	
+	
+	//Semantic Check
+	//Look for the identifier to be declared previously in the symbol table
+	//Otherwise were would we save what we read
+	//This is an easy one, is it not? ;)
+	get_symbol(identifier, PRG_GetScope(), "var"); 
+	
+	
+	IR_AddIOREAD(identifier);
+}
+
+void IR_MakeASSIGN(char *identifier){
+	char *identifier_type;
+	char *expression_type;
+	char *expression;
+	
+	//Semantic Check
+	//Look for the identifier to be declared previously in the symbol table
+	//In assignment. The symbol to look for is either a var, or a parameter.
+	get_symbol(identifier, PRG_GetScope(), "var"); 
+	
+	//Semantic Check
+	// Check that the identifier and the expression have the same type
+	identifier_type = getTypeFromSymbol(identifier);
+	expression_type = stackPop(&typeStack);
+	
+	if(strcmp(identifier_type,expression_type)!=0){
+		printf("LINE: %-4d CALL: IR_MakeASSIGN(%s)\n", g_lineno, identifier);
+		printf("FATAL: Type mismatch. Trying to assign %s to a \"%s\" of type %s \n", expression_type, identifier, identifier_type);
+		exit(EXIT_FAILURE);
+	}
+	
+	if(VERBOSE)
+		printf("LINE: %-4d IR_MakeASSIGN(%s)\n", g_lineno, identifier);
+	
+	expression = stackPop(&operandStack);
+	//Code generation
+	IR_AddASSIGN(identifier,expression);
+}
+
 
 void IR_MakeIF(){
 	char *typeName = stackPop(&typeStack);
@@ -356,6 +464,8 @@ void EXP_PushOperand(char *operand, char *symbolKind){
 		printf("LINE: %-4d EXP_PushOperand(%s,%s)\n", g_lineno, operand,symbolKind);
 }
 
+
+
 void PRG_Initialize(){
 	PRG_SetScope("global");
 	
@@ -425,14 +535,14 @@ params			: /* empty */ | paramlist;
 paramlist       : paramlist COMMATKN param 
 				| param;
 
-param           : type IDTKN { save_symbol($1, $2, PRG_GetScope(), "param"); };  /* no arrays as parameters... yet*/
+param           : type IDTKN { save_symbol($1, $2, PRG_GetScope(), "param"); };
 
 						
 vardeclarations : vardeclarations vardeclaration SEMICOLONTKN;
 				| vardeclaration SEMICOLONTKN;
 
 vardeclaration  : type IDTKN { save_symbol($1, $2, PRG_GetScope(), "var"); }
-				| type IDTKN LEFTBTKN INTVALTKN RIGHTBTKN { save_symbol($1, $2, PRG_GetScope(), "ary"); } ; /* int arreglo[3]; */
+				| type IDTKN LEFTBTKN INTVALTKN RIGHTBTKN; // NOT YET
 
 type   			: INTTKN | DOUBLETKN | STRINGTKN | BOOLTKN;
 
@@ -450,11 +560,11 @@ a_closeif		: { IR_MakeENDIF(); }
 
 iterstmt		: WHILETKN LEFTPTKN expstmt RIGHTPTKN OPENBLOCKTKN blockstmts ENDWHILETKN;
 
-assignstmt      : IDTKN ASSIGNTKN expstmt { get_symbol($1, PRG_GetScope(), "var"); SMT_CheckStatement("=", $1); }
-				| IDTKN LEFTBTKN INTVALTKN RIGHTBTKN ASSIGNTKN expstmt  { get_symbol($1, PRG_GetScope(), "ary"); SMT_CheckStatement("=", $1); };
+assignstmt      : IDTKN ASSIGNTKN expstmt { IR_MakeASSIGN($1); }
+				| IDTKN LEFTBTKN INTVALTKN RIGHTBTKN ASSIGNTKN expstmt; //NOT YET
 									
-iostmt          : READTKN var  { get_symbol($2, PRG_GetScope(), "var");}
-				| WRITETKN expstmt;
+iostmt          : READTKN var  { IR_MakeIOREAD($2); }
+				| WRITETKN expstmt {IR_MakeIOWRITE(); };
 									
 var             : identifier 
 				| identifier LEFTBTKN INTVALTKN RIGHTBTKN;
