@@ -335,6 +335,50 @@ void IR_MakeASSIGN(char *identifier){
 	IR_AddASSIGN(identifier,expression);
 }
 
+void IR_MakeWHILE(){
+	char *expression;
+	char *expression_type;
+	char *instruction;
+	
+	expression = stackPop(&operandStack);
+	expression_type = stackPop(&typeStack);
+	
+	if(strcmp(expression_type,"boolean")!=0){
+		printf("LINE: %-4d CALL: IR_MakeWHILE()\n", g_lineno);
+		printf("FATAL: While Iterator only accepts boolean arguments \n");
+		exit(EXIT_FAILURE);
+	}
+	
+	instruction = concat("GOTOF ", expression);
+	IRCode[program_counter] = instruction;
+	int_stackPush(&jumpStack,program_counter);
+	program_counter++;
+}
+
+void IR_MakeENDWHILE(){
+	// The stack looks like this here
+	// 2: La direccion del gotof
+	// 1: La direccion del comienzo del while, antes de la exp
+	
+	// POP jumpStack
+	// Rellenar IR pasado con program_counter
+	int while_condition_address = int_stackPop(&jumpStack);
+	char jmp_address[MAX_PROGRAM_SIZE+1];
+	sprintf(jmp_address, " %d", program_counter);
+	
+	char *while_condition_instruction = IRCode[while_condition_address];
+	while_condition_instruction = concat(while_condition_instruction, jmp_address);
+	IRCode[while_condition_address] = strdup(while_condition_instruction);
+	
+	// POP jumpStack
+	// Generar instruccion de goto incondicional al poped
+	int while_beginning_address = int_stackPop(&jumpStack);
+	sprintf(jmp_address, " %d", while_beginning_address);
+	char *instruction = concat("GOTO ", jmp_address);
+	IRCode[program_counter] = instruction;
+	program_counter++;
+}
+
 void IR_MakeIF(){
 	char *typeName = stackPop(&typeStack);
 	char *operand = stackPop(&operandStack);
@@ -575,7 +619,8 @@ a_openif		: { IR_MakeIF(); }
 a_closeif		: { IR_MakeENDIF(); }
 a_elseif		: { IR_MakeELSEIF(); }
 
-iterstmt		: WHILETKN LEFTPTKN expstmt RIGHTPTKN OPENBLOCKTKN blockstmts ENDWHILETKN;
+iterstmt		: WHILETKN a_savejump LEFTPTKN expstmt { IR_MakeWHILE(); } RIGHTPTKN OPENBLOCKTKN blockstmts ENDWHILETKN { IR_MakeENDWHILE(); };
+a_savejump		: { int_stackPush(&jumpStack, program_counter); }
 
 assignstmt      : IDTKN ASSIGNTKN expstmt { IR_MakeASSIGN($1); }
 				| IDTKN LEFTBTKN INTVALTKN RIGHTBTKN ASSIGNTKN expstmt; //NOT YET

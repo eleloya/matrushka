@@ -30,6 +30,10 @@ func int:sum(int x, int y):
 		write "Era falso";
 	endi
 		
+	while(true || false && true):
+		write "inside loop";
+	endw
+		
 	return resulta;
 endf
 
@@ -37,16 +41,7 @@ endf
 func int:main():
 	int suma_resultado;
 	string tmp;
-	//add_lista_a (1+2)
-	//add_lista_a 2
-	//check_signature(sum,pila_p)
-	// -> generame lista de parametros parasum.
-	// -> Si la lista paramsum termina esta mas grande que lista_a : error (insuffucient params)
-	// -> Si la lista paramsum termina esta mas pequeña que lista_a : error (more params than need)
-	//
-	// -> remover elementos de paramsum con el mismo tipo que lista_a
-	// 		-> Si la lista paramsum termina vacia cool
-	// -> si no se puede remover algo: error (bad signature)
+
 	suma_resultado = sum(1+2,2);
 	
 	read tmp;
