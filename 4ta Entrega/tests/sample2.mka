@@ -23,6 +23,13 @@ func int:sum(int x, int y):
 		resulta = 3 + 1 + x * y;	
 	endi
 		
+	if(test):
+		write 0;
+		write "Era verdedadero";
+	else
+		write "Era falso";
+	endi
+		
 	return resulta;
 endf
 

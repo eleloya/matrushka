@@ -95,9 +95,6 @@ void EXP_PushOperator(char *op){
 		printf("LINE: %-4d EXP_PushOperator(%s)\n", g_lineno, op);	
 }
 
-// save_symbol("int","counter","global","var")
-// save_symbol("int","counter","global","func")
-// save_symbol("int","counter","global","param")
 void save_symbol(char *typeName, char *identifierName, char *scopeName, char *symbolKind){
 	int response;
 
@@ -145,9 +142,6 @@ void get_symbol(char *identifierName, char *scopeName, char *symbolKind){
 	//printf("Checking for '%s' symbol existance on scope %s of type %s\n", identifierName, scopeName, symbolKind);
 }
 
-/* Dictionary. Gets the Token type of a value. 
-STRING->TOKEN 
-*/
 char *getTypeFromValue(char *value){
 	if(strstr(value, "\"") != NULL) {
 		return "string";
@@ -341,7 +335,6 @@ void IR_MakeASSIGN(char *identifier){
 	IR_AddASSIGN(identifier,expression);
 }
 
-
 void IR_MakeIF(){
 	char *typeName = stackPop(&typeStack);
 	char *operand = stackPop(&operandStack);
@@ -358,6 +351,31 @@ void IR_MakeIF(){
 	
 	//Code Generation Subroutine
 	IR_AddGotoF(operand);
+}
+
+void IR_MakeELSEIF(){
+	int previous_if_address = int_stackPop(&jumpStack);
+	
+	//GENERAR GOTO _____
+	char *instruction;
+	instruction = strdup("GOTO ");
+	IRCode[program_counter] = instruction;
+	int_stackPush(&jumpStack, program_counter);
+	program_counter++;
+	
+	//SACAR FALSO DE PILA-DE-SALTOS
+	char *previous_if_instruction;
+	char jmp_address[MAX_PROGRAM_SIZE];
+	sprintf(jmp_address, "%d", program_counter);
+
+	previous_if_instruction = IRCode[previous_if_address];
+	
+	// "GOTOF var" + " " + JMP_ADDRESS
+	previous_if_instruction  = concat(previous_if_instruction, " ");
+	previous_if_instruction  = concat(previous_if_instruction, jmp_address);
+	
+	IRCode[previous_if_address] = strdup(previous_if_instruction);
+	free(previous_if_instruction);
 }
 
 void IR_MakeENDIF(){
@@ -452,7 +470,7 @@ void pushOperand(char *operand, char *kind){
 void EXP_PushOperand(char *operand, char *symbolKind){
 	//TO-DO Check for NULLS
 	
-	//Check for the existance of such variable before even continuing.
+	//Check for the existance of a variable before even continuing.
 	if(strcmp(symbolKind,"var")==0)
 		get_symbol(operand, PRG_GetScope(), "var"); 
 	
@@ -463,8 +481,6 @@ void EXP_PushOperand(char *operand, char *symbolKind){
 	if(VERBOSE)
 		printf("LINE: %-4d EXP_PushOperand(%s,%s)\n", g_lineno, operand,symbolKind);
 }
-
-
 
 void PRG_Initialize(){
 	PRG_SetScope("global");
@@ -553,10 +569,11 @@ blockstmts      : blockstmts blockstmt;
 blockstmt       : assignstmt SEMICOLONTKN | ifstmt | iterstmt | iostmt SEMICOLONTKN | callstmt SEMICOLONTKN;
 
 ifstmt          : IFTKN LEFTPTKN expstmt a_openif RIGHTPTKN OPENBLOCKTKN blockstmts ENDIFTKN a_closeif
- 				| IFTKN LEFTPTKN expstmt a_openif RIGHTPTKN OPENBLOCKTKN blockstmts ELSETKN blockstmts ENDIFTKN;
+ 				| IFTKN LEFTPTKN expstmt a_openif RIGHTPTKN OPENBLOCKTKN blockstmts ELSETKN a_elseif blockstmts ENDIFTKN a_closeif;
 
 a_openif		: { IR_MakeIF(); }
 a_closeif		: { IR_MakeENDIF(); }
+a_elseif		: { IR_MakeELSEIF(); }
 
 iterstmt		: WHILETKN LEFTPTKN expstmt RIGHTPTKN OPENBLOCKTKN blockstmts ENDWHILETKN;
 
