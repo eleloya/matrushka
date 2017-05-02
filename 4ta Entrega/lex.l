@@ -14,10 +14,10 @@ int g_lineno = 1;
 %option yylineno
 
 
-integer -?[0-9]+
-double -?[0-9]+\.[0-9]+
+integer [0-9]+
+double [0-9]+\.[0-9]+
 string \"(\\.|[^\\"])*\"
-identifier [a-zA-Z]+[a-zA-Z0-9_]*
+identifier [a-zA-Z]+[0-9]*
 whitespace [ \t]+
 newline \n
 comments \/\/.*

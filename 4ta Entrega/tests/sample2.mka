@@ -3,51 +3,25 @@ cipher "aes256", "passphrase";
 
 int count;
 bool test;
-string afdright;
-
 //Auxiliary Functions
 
-func string:concat(string sleft, string sright):
-	string result;
-	
-	result = sleft + sright + afdright; 
-	
-	// check_return(concat,result) : allow : syntax_error
-	return "jeje";
+func int:void():
+	write "jeje";
 endf
-	
-func int:sum(int x, int y):
-	int resulta;
-	
-	if(true):
-		resulta = 3 + 1 + x * y;	
-	endi
-		
-	if(test):
-		write 0;
-		write "Era verdedadero";
-	else
-		write "Era falso";
-	endi
-		
-	while(true || false && true):
-		write "inside loop";
-	endw
-		
-	return resulta;
-endf
-
 
 func int:main():
-	int suma_resultado;
-	string tmp;
 
-	suma_resultado = sum(1+2,2);
+	int arithi;
+	double arithd;
+	string ariths;
 	
-	read tmp;
-	write "lero" + "lero";
-	write 0;
-	write true;
-	write 4.3;
-	return 3;
+	ariths = "loyisima";
+	arithd = 1.5+1.5+arithi;
+
+	if(ariths=="loyisima"):
+		write arithi;
+		write arithd;
+		write ariths=="loyisima";
+	endi
+	return arithi;
 endf

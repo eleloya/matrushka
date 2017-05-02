@@ -19,6 +19,7 @@ struct symbol{
 		char *contextName;
 		char *symbolKind;
 		int memoryLocation;
+		int number;
 };
 
 //Auxiliary funcion
@@ -98,6 +99,19 @@ char * memberType(struct symbol hashtable[], char *identifierName, char *context
 	}
 }
 
+int memberNumber(struct symbol hashtable[], char *identifierName, char *contextName){
+	unsigned int b = locate(hashtable, identifierName, contextName);	
+	if (NULL == hashtable[b].value){
+		 b = locate(hashtable, identifierName, "global");
+  }		
+	
+	if (NULL == hashtable[b].value){
+		return -1;
+	}else{
+		return hashtable[b].number;
+	}
+}
+
 int generateAddress(char *typeName){
 	//TO-DO Check for NULLS on symbolKind
 	
@@ -124,6 +138,19 @@ int insert(struct symbol hashtable[], char *typeName, char *identifierName, char
 	unsigned int key;	
 	int address = generateAddress(typeName);
 	key = locate(hashtable, identifierName, contextName);
+	int numero = 1;
+	//Lo que podria hacer es. checar cuantos existen que tengan ya ese contexto.
+	//Y eso guardalo como number
+	
+	
+	//Checamos si existen elementos pasados con el mismo contexto
+	for(int i=0;i<SYMBOL_TABLE_SIZE;i++){
+		if(NULL != hashtable[i].value){
+			if(strcmp(hashtable[i].contextName,contextName)==0){
+				numero++;
+			}
+		}
+	}
 	
 	if (NULL == hashtable[key].value){
 		hashtable[key].value = strdup(identifierName);
@@ -131,6 +158,7 @@ int insert(struct symbol hashtable[], char *typeName, char *identifierName, char
 		hashtable[key].typeName = strdup(typeName);
 		hashtable[key].symbolKind =  strdup(symbolKind);
 		hashtable[key].memoryLocation = address;
+		hashtable[key].number = numero;
 		return 0;
 	}	
 	return 1;
