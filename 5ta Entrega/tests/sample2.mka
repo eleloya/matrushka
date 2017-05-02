@@ -1,0 +1,27 @@
+// save_cipher("aes256","passphrase")
+cipher "aes256", "passphrase";
+
+int count;
+bool test;
+//Auxiliary Functions
+
+func int:void():
+	write "jeje";
+endf
+
+func int:main():
+
+	int arithi;
+	double arithd;
+	string ariths;
+	
+	ariths = "loyisima";
+	arithd = 1.5+1.5+arithi;
+
+	if(ariths=="loyisima"):
+		write arithi;
+		write arithd;
+		write ariths=="loyisima";
+	endi
+	return arithi;
+endf

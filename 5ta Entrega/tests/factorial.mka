@@ -1,0 +1,36 @@
+// save_cipher("aes256","passphrase")
+cipher "aes256", "passphrase";
+
+int count;
+bool test;
+//Auxiliary Functions
+
+	
+func int:fact(int x):
+		if ( x == 0 ):
+        return 1;
+		endi
+    return (x * fact(x - 1));
+endf
+
+
+func int:main():
+
+	int resultado;
+	
+	//resultado = fact(3+2);
+	
+	resultado = fact(5);
+	
+	read count;
+	
+	while(resultado>1):
+		write "global value:";
+		write count;
+		write "\n factorial vaue:";
+		write resultado;
+		resultado = resultado -1;
+	endw
+	
+	return 0;
+endf

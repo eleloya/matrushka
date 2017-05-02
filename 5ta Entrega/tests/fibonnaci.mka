@@ -1,0 +1,36 @@
+// save_cipher("aes256","passphrase")
+cipher "aes256", "passphrase";
+
+int global;
+	
+func int:fibonacci(int n):
+	int num;
+	num = n;
+	if( num == 0 ):
+		return 0;
+	endi
+
+	if ( num == 1 ):
+		return 1;
+	endi
+
+	return fibonacci(num-1) + fibonacci(num-1);
+endf
+
+func int:main():
+	int n;
+	int c;
+	int f;
+ 
+  read n;
+ 	c = 1;
+	global = 4;
+	
+  write "Fibonacci series\n";
+ 
+  while(c<=n):
+		n = n - 1;
+	endw
+		
+ return 0;
+endf

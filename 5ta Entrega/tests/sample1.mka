@@ -1,0 +1,13 @@
+int a;
+
+func int:suma(int param1,int param2):
+	int ba[3];
+	a = 1;
+	return a;
+endf
+
+func int:main():
+		write "Tarjeta debito";
+		write "el pin es: ";
+		write suma(4244, 2);
+endf
