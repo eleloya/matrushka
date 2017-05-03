@@ -1,0 +1,39 @@
+MATRUSHKA VIRTUAL MACHINE
+
+
+First pass
+-----------------------------
+
+A function suma at location 3
+A function main at location 9
+A function main with 2 variables
+A function suma with 4 variables
+
+Second pass
+-----------------------------
+
+  0: Allocating 2 spaces for main
+  1: Jumping to function main at address 9
+  9: Starting the function main
+  9: CURRENT_STACK_FRAME: 0 NEXT_STACK_FRAME 2
+ 10: Printing "Tarjeta debito"
+ 11: Printing " el pin es: \n"
+ 12: Allocating 4 spaces for suma
+ 13: Pushing 4244
+ 14: Pushing 2
+ 15: Jumping to function suma at address 3
+  3: Starting the function suma
+  3: CURRENT_STACK_FRAME: 2 NEXT_STACK_FRAME 6
+  4: IADD (%STACK+2) (%STACK+1) (%STACK+3)
+  4: IADD 2 + 4244 = 4246
+  5: IADD 1 (%STACK+3) (%STACK+4)
+  5: IADD 1 + 4246 = 4247
+  6: GLOBALSTACK: []
+  6: STACK: [0, 0, '4244', '2', 4246, 4247]
+  6: CALLSTACK [25, 16]
+  6: RETV 4247
+  6: GLOBALSTACK: []
+  6: STACK: [0, 0, 4247]
+  6: CALLSTACK [25, 16]
+ 16: POPV 4247, STACK: [4247, 0]
+ 16: CURRENT_STACK_FRAME: 0 NEXT_STACK_FRAME 2

@@ -5,32 +5,37 @@ FILE * outputFile;
 
 int main(int argc, char * argv[] ){ 
 	char *resultado;
-  char filename[256]; //The name of the file containing the source code
-  if (argc != 2){ 
-			fprintf(stderr,"Invalid command\n");
-		 	fprintf(stderr,"Usage: %s source.mka\n",argv[0]);
-      exit(1);
-  }else{
-  		strcpy(filename,argv[1]) ;
-  		inputFile = fopen(filename,"r");
-  		if (inputFile==NULL){ 
-				fprintf(stderr,"Error trying to open '%s'\n",filename);
-    		exit(1);
-  		}
+	char filename[256]; //The name of the file containing the source code
+	char target[256]; //The name of the file containing the intermediate code
+	if (argc != 3){ 
+		printf("Invalid command\n");
+	 	printf("Usage: %s source.mka target.bab\n",argv[0]);
+	  exit(1);
+	}else{
+		strcpy(filename,argv[1]) ;
+		strcpy(target,argv[2]) ;
+		inputFile = fopen(filename,"r");
+		outputFile = fopen(target,"w");
+		if (outputFile==NULL){ 
+			printf("Error trying to open '%s'\n",target);
+			exit(1);
+		}
+		if (inputFile==NULL){ 
+			printf("Error trying to open '%s'\n",filename);
+			exit(1);
+		}
 	}
-  outputFile = stdout;
-  
-	//fprintf(outputFile,"\nCompiling: %s\n",filename);
 	
-	fprintf(outputFile,"\n###################");
-	fprintf(outputFile,"\n     COMPILING       ");
-	fprintf(outputFile,"\n###################\n\n");	
-	
-  yyin = inputFile;
-  yyout = outputFile;
-	
+	printf("\n###################");
+	printf("\n     COMPILING       ");
+	printf("\n###################\n\n");	
+
+	yyin = inputFile;
+	yyout = outputFile;
+
 	yyparse();	
-	
-  fclose(inputFile);
+
+	fclose(inputFile);
+	fclose(outputFile);
 	return 0;
 }

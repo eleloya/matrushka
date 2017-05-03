@@ -1,0 +1,28 @@
+ERAS *era_size_main*
+CALL _main
+
+_suma:
+IADD (%STACK+2) (%STACK+1) (%STACK+3)
+IADD 1 (%STACK+3) (%STACK+4)
+RETV (%STACK+4)
+ENDF
+
+_main:
+SPUT "Tarjeta debito"
+SPUT "el pin es:"
+ERAS *era_size_suma*
+PUSH 4244
+PUSH 2
+CALL _suma
+POPV (%STACK+1)
+MOVE (%STACK+1) (%GLOBALS+1)
+LTVL 9999 (%GLOBALS+1) (%STACK+2)
+GTOF (%STACK+2) 23
+IPUT (%GLOBALS+1)
+GOTO  24
+SPUT "No se puede tener un pin con mas de 4 digitos"
+ENDF
+
+.data:
+era_size_main: 2
+era_size_suma: 4

@@ -4,7 +4,7 @@
 #include "util/hash.c"
 #define YYPARSER 
 #define YYSTYPE char *
-#define VERBOSE 0	
+#define VERBOSE 1
 #define MAX_TMP_VARIABLES 1024
 #define MAX_PROGRAM_SIZE 1000
 
@@ -71,6 +71,12 @@ void DBG_PrintIRCode(){
 		printf("%5d: %s\n",i, IRCode[i]);
 }
 
+int PRG_SaveIRCode(){ 
+	for(int i=0;i<program_counter;i++)
+		fprintf(outputFile,"%s\n",IRCode[i]);
+  return 1;
+}
+
 /****************************************************************************/
 /**                                                                        **/
 /**                  ATTRIBUTE GRAMMAR FUNCTIONS                           **/
@@ -85,9 +91,8 @@ char * PRG_SemanticCube(char* op, char *operand1, char *operand2){
 	char *result_type;
 	char *opcode;
 	opcode = strdup("ERR");
-	
 	// (boolean, boolean)
-	if(strcmp(operand1,"boolean")==0 && strcmp(operand2,"boolean")){
+	if(strcmp(operand1,"boolean")==0 && strcmp(operand2,"boolean")==0){
 		if(strcmp(op,"==")==0){
 			opcode = strdup("EQLV");
 			result_type = strdup("boolean");
@@ -368,7 +373,10 @@ void PRG_GetSymbol(char *identifierName, char *scopeName, char *symbolKind){
 	//Variables are search'd in both the local and global scope
 	response_local  = member(SymbolTable, identifierName, scopeName);
 	response_global = member(SymbolTable, identifierName, "global");
-	if(response_local==0 && response_global==0){
+	int response_ary_local =  member(SymbolTable, concat(identifierName,"_0"), scopeName);
+	int response_ary_global = member(SymbolTable, concat(identifierName,"_0"), "global");
+	
+	if( response_local==0 && response_global==0 && response_ary_local==0 && response_ary_global==0 ){
 		printf("LINE: %-4d CALL: PRG_GetSymbol(%s,%s,%s)\n", g_lineno,identifierName, scopeName, symbolKind);
 		printf("FATAL: Trying to access undeclared variable\n");
 		exit(EXIT_FAILURE);
@@ -413,11 +421,14 @@ void PRG_Initialize(){
 void pushType(char *value, char *symbolKind){
 	char *factorType;
 	
+	
 	if(strcmp(symbolKind,"const")==0){ // then is a constant
 		factorType = getTypeFromValue(value);
 		//printf("Retrived type for %s is %s\n\n", value, factorType);
 	}else{ // then is a variable or a function
 		factorType = memberType(SymbolTable, value, PRG_GetScope());
+		if(!factorType)
+			factorType = memberType(SymbolTable, concat(value,"_0"), PRG_GetScope());
 		//printf("Retrived type for %s is %s in scope: %s\n\n", value, factorType, PRG_GetScope());
 	}
 		
@@ -428,12 +439,16 @@ void pushType(char *value, char *symbolKind){
 void pushOperand(char *operand, char *kind){
 	int offset;
 	char offset_string[MAX_PROGRAM_SIZE];
+	
+	
+
 	//A lo mejor deberia checar que sea permitido. Pero no pasarian por flex ni bison...
 	if(strcmp(kind,"func")==0){
 		stackPush(&operandStack, operand);
 	}else if(strcmp(kind,"const")==0){
 		stackPush(&operandStack, operand);
 	}else{
+		
 	//Else means that it is not a function, it is not a constnat.
 	//So it means it must be within reach of the stack.
 	//We can calculate that if we know the index of the variable in the stack
@@ -441,15 +456,16 @@ void pushOperand(char *operand, char *kind){
 	sprintf(offset_string, "%d", offset);
 
 	int response_global = member(SymbolTable, operand, "global");
+	int response_local = member(SymbolTable, operand, PRG_GetScope());
 	
-	if(response_global){
+	if(response_local){
+			offset = memberNumber(SymbolTable, operand, PRG_GetScope());	
+			sprintf(offset_string, "%d", offset);
+			operand = concat("(",concat("\%STACK",concat("+",concat(offset_string,")"))));
+	}else if(response_global){
 		offset = memberNumber(SymbolTable, operand, "global");	
 		sprintf(offset_string, "%d", offset);
 		operand = concat("(",concat("\%GLOBALS",concat("+",concat(offset_string,")"))));
-	}else{
-		offset = memberNumber(SymbolTable, operand, PRG_GetScope());	
-		sprintf(offset_string, "%d", offset);
-		operand = concat("(",concat("\%STACK",concat("+",concat(offset_string,")"))));
 	}
 	
 	stackPush(&operandStack, operand);	
@@ -459,10 +475,11 @@ void pushOperand(char *operand, char *kind){
 void EXP_PushOperand(char *operand, char *symbolKind){
 	//TO-DO Check for NULLS
 	
+
 	//Check for the existance of a variable before even continuing.
 	if(strcmp(symbolKind,"var")==0)
 		PRG_GetSymbol(operand, PRG_GetScope(), "var"); 
-	
+
 	//Later is the same for both expressions
 	pushType(operand, symbolKind); 
 	pushOperand(operand, symbolKind);
@@ -630,6 +647,57 @@ void IR_MakeIOREAD(char *identifier){
 	IR_AddIOREAD(identifier);
 }
 
+void IR_MakeARGYASSIGN(char *identifier){
+	char *identifier_type;
+	char *expression_type;
+	char *expression;
+	
+	char *index_expression;
+	//Semantic chec
+	//Look for the identifier to be declared previously
+	PRG_GetSymbol(concat(identifier,"_0"), PRG_GetScope(), "var"); 
+	
+	identifier_type = getTypeFromSymbol(concat(identifier,"_0"), PRG_GetScope());
+	expression_type = stackPop(&typeStack);
+	if(strcmp(identifier_type,expression_type)!=0){
+		printf("LINE: %-4d CALL: IR_MakeARGYASSIGN(%s)\n", g_lineno, identifier);
+		printf("FATAL: Type mismatch. Trying to assign %s to an array \"%s\" of type %s \n", expression_type, identifier, identifier_type);
+		exit(EXIT_FAILURE);
+	}
+	
+	//The expression to assign
+	expression = stackPop(&operandStack);
+	
+	int offset;	
+	char offset_string[MAX_PROGRAM_SIZE];
+
+	//This gives use the base address for the array
+	int response_global = member(SymbolTable, concat(identifier,"_0"), "global");
+	int response_local = member(SymbolTable, concat(identifier,"_0"), PRG_GetScope());
+	if(response_local){
+		offset = memberNumber(SymbolTable, concat(identifier,"_0"), PRG_GetScope());	
+		sprintf(offset_string, "%d", offset);
+		identifier = concat("(",concat("\%STACK",concat("+",concat(offset_string,")"))));
+	}else if(response_global){
+		offset = memberNumber(SymbolTable, concat(identifier,"_0"), "global");	
+		sprintf(offset_string, "%d", offset);
+		identifier = concat("(",concat("\%GLOBALS",concat("+",concat(offset_string,")"))));
+	}
+	
+	//Now for the index
+	index_expression = stackPop(&operandStack);
+	stackPop(&typeStack);; // Don't do anything with it, just take it out
+	
+	// "= " + expression + " " + identifier
+	// = (%STACK+3) (%STACK+3[index])
+	identifier = concat(identifier,concat("[", concat(index_expression,"]")));
+	char * instruction = concat("MOVE ", expression);
+	instruction = concat(instruction, " ");
+	instruction = concat(instruction, identifier);
+	
+	IRCode[program_counter] = instruction;
+	program_counter++;
+}
 void IR_MakeASSIGN(char *identifier){
 	char *identifier_type;
 	char *expression_type;
@@ -660,15 +728,16 @@ void IR_MakeASSIGN(char *identifier){
 	char offset_string[MAX_PROGRAM_SIZE];
 
 	int response_global = member(SymbolTable, identifier, "global");
+	int response_local = member(SymbolTable, identifier, PRG_GetScope());
 	
-	if(response_global){
-		offset = memberNumber(SymbolTable, identifier, "global");	
-		sprintf(offset_string, "%d", offset);
-		identifier = concat("(",concat("\%GLOBALS",concat("+",concat(offset_string,")"))));
-	}else{
+	if(response_local){
 		offset = memberNumber(SymbolTable, identifier, PRG_GetScope());	
 		sprintf(offset_string, "%d", offset);
 		identifier = concat("(",concat("\%STACK",concat("+",concat(offset_string,")"))));
+	}else if(response_global){
+		offset = memberNumber(SymbolTable, identifier, "global");	
+		sprintf(offset_string, "%d", offset);
+		identifier = concat("(",concat("\%GLOBALS",concat("+",concat(offset_string,")"))));
 	}
 
 	//Code generation
@@ -704,7 +773,7 @@ void IR_MakeENDWHILE(){
 	// Rellenar IR pasado con program_counter+1 (uno despues del goto incondicional)
 	int while_condition_address = int_stackPop(&jumpStack);
 	char jmp_address[MAX_PROGRAM_SIZE+1];
-	sprintf(jmp_address, " %d", program_counter+1);
+	sprintf(jmp_address, " %d", program_counter + 2);
 	
 	char *while_condition_instruction = IRCode[while_condition_address];
 	while_condition_instruction = concat(while_condition_instruction, jmp_address);
@@ -713,7 +782,7 @@ void IR_MakeENDWHILE(){
 	// POP jumpStack
 	// Generar instruccion de goto incondicional al poped
 	int while_beginning_address = int_stackPop(&jumpStack);
-	sprintf(jmp_address, " %d", while_beginning_address);
+	sprintf(jmp_address, " %d", while_beginning_address +1);
 	char *instruction = concat("GOTO ", jmp_address);
 	IRCode[program_counter] = instruction;
 	program_counter++;
@@ -750,7 +819,7 @@ void IR_MakeELSEIF(){
 	//SACAR FALSO DE PILA-DE-SALTOS
 	char *previous_if_instruction;
 	char jmp_address[MAX_PROGRAM_SIZE];
-	sprintf(jmp_address, "%d", program_counter);
+	sprintf(jmp_address, "%d", program_counter+1);
 
 	previous_if_instruction = IRCode[previous_if_address];
 	
@@ -768,7 +837,7 @@ void IR_MakeENDIF(){
 	char jmp_address[MAX_PROGRAM_SIZE];
 	
 	char *instruction = IRCode[previous_if_address];
-	sprintf(jmp_address, "%d", program_counter);		
+	sprintf(jmp_address, "%d", program_counter+1);		
 	
 	char *new_instruction_tmp1;
 	char *new_instruction;
@@ -853,12 +922,11 @@ void IR_MakeCALL(char *identifier){
 	sprintf(suffix_for_temporal_variable, "%d", temporals_counter++);
 	temporal_variable = concat("T", suffix_for_temporal_variable);
 	
-	PRG_SaveSymbol(getTypeFromSymbol(PRG_GetScope(), PRG_GetScope()), temporal_variable, PRG_GetScope(), "tmp"); 
+	PRG_SaveSymbol(getTypeFromSymbol(identifier, "global"), temporal_variable, PRG_GetScope(), "tmp"); 
 	
 	EXP_PushOperand(temporal_variable, PRG_GetScope());
 	temporal_variable = stackPop(&operandStack);
 	stackPush(&operandStack,temporal_variable);
-	
 	instruction = concat("CALL _", identifier);
 	IRCode[program_counter] = instruction;
 	program_counter++;
@@ -912,6 +980,18 @@ void IR_MakeEXP(){
 	IR_AddEXP(operator,operand1,operand2,temporal_variable);
 }
 
+void save_ary_symbol(char *type, char *identifier, char *range){
+	char identifier_index[MAX_TMP_VARIABLES+1];
+	int rangeindex;
+	char *array_identifier;
+	rangeindex = atoi(range);
+	for(int i=0;i<rangeindex;i++){
+		sprintf(identifier_index, "_%d", i);
+		array_identifier = concat(identifier,identifier_index);
+		PRG_SaveSymbol(type, array_identifier, PRG_GetScope(), "var");
+		free(array_identifier);
+	}
+}
 %}
 
 //Reserved Words
@@ -961,7 +1041,7 @@ Atributos para llamadas de funciones:
 	//TO-DO pasar las dos funciones de al final para el final de main.c
 	//que pedo con los programas sin secerto.. checar si se awita el shift reduce
 	//remplazar esa funcion de al final con una seccion de los tamaños del ERA:
-program   		: secrets { PRG_Initialize(); } vardeclarations functions eraupdate { DBG_PrintSymbolTable(SymbolTable); DBG_PrintIRCode(); }
+program   		: secrets { PRG_Initialize(); } vardeclarations functions eraupdate { DBG_PrintSymbolTable(SymbolTable); DBG_PrintIRCode(); PRG_SaveIRCode(); }
 				| secrets { PRG_Initialize(); } functions eraupdate
 eraupdate       : { PRG_ERAUpdate(); }
 										
@@ -991,7 +1071,7 @@ vardeclarations : vardeclarations vardeclaration SEMICOLONTKN;
 				| vardeclaration SEMICOLONTKN;
 
 vardeclaration  : type IDTKN { PRG_SaveSymbol($1, $2, PRG_GetScope(), "var"); }
-				| type IDTKN LEFTBTKN INTVALTKN RIGHTBTKN; // NOT YET
+								| type IDTKN LEFTBTKN INTVALTKN RIGHTBTKN { save_ary_symbol($1,$2,$4); }; 
 
 type   			: INTTKN | DOUBLETKN | STRINGTKN | BOOLTKN;
 
@@ -1012,18 +1092,18 @@ iterstmt		: WHILETKN a_savejump LEFTPTKN expstmt { IR_MakeWHILE(); } RIGHTPTKN O
 a_savejump		: { int_stackPush(&jumpStack, program_counter); }
 
 assignstmt      : IDTKN ASSIGNTKN expstmt { IR_MakeASSIGN($1); }
-				| IDTKN LEFTBTKN INTVALTKN RIGHTBTKN ASSIGNTKN expstmt; //NOT YET
+								| IDTKN LEFTBTKN expstmt RIGHTBTKN ASSIGNTKN expstmt { IR_MakeARGYASSIGN($1); }; //NOT YET
 									
 iostmt          : READTKN var  { IR_MakeIOREAD($2); }
 				| WRITETKN expstmt {IR_MakeIOWRITE(); };
 									
-var             : identifier 
-				| identifier LEFTBTKN INTVALTKN RIGHTBTKN;
+var     : identifier 
+				| identifier LEFTBTKN expstmt RIGHTBTKN;
 
 identifier		: IDTKN;
 			
 expstmt         : expstmt compoperator {  EXP_PushOperator($2); } exp { IR_MakeEXP(); } 
-				| exp;
+								| exp;
 
 compoperator    : LTTKN | LTETKN | GTTKN | GTETKN | EQUALTKN | NOTEQUALTKN | ORTKN | ANDTKN;
 
@@ -1031,17 +1111,17 @@ exp             : exp additiveoperator { EXP_PushOperator($2); } term { IR_MakeE
 				| term;
 additiveoperator: MINUSTKN | PLUSTKN;
 
-term    		: term TIMESTKN { EXP_PushOperator($2); }  factor  { IR_MakeEXP();}
+term    : term TIMESTKN { EXP_PushOperator($2); }  factor  { IR_MakeEXP();}
 				| term DIVTKN { EXP_PushOperator($2); } factor  { IR_MakeEXP();}
 				| factor
 
-values          : INTVALTKN 
+values  : INTVALTKN 
 				| DOUBLEVALTKN  
 				| STRINGVALTKN   
 				| TRUETKN  
 				| FALSETKN;
 
-factor			: LEFTPTKN { /* fake bottom */ } exp { /* fake bottom */ } RIGHTPTKN
+factor	: LEFTPTKN { /* fake bottom */ } exp { /* fake bottom */ } RIGHTPTKN
 				| var  { EXP_PushOperand($1, "var"); }
 				| values { EXP_PushOperand($1, "const"); }
 				| callstmt {  IR_MakeCALL($1); };
@@ -1059,7 +1139,7 @@ returnstmt      : RETURNFUNCTKN expstmt { IR_MakeRETURN(); };
 
 int yyerror(char * message)
 	
-{ fprintf(outputFile,"at line %d: %s\n",g_lineno,message);
+{ fprintf(stderr,"at line %d: %s\n",g_lineno,message);
   //fprintf(outputFile,"token: %d\n\n", yychar);
   return 1;
 }

@@ -1,0 +1,658 @@
+#!/usr/bin/env python3
+import sys
+import re
+
+def header():
+    print("MATRUSHKA VIRTUAL MACHINE\n")
+
+def usage():
+    print("Usage: ./mvm.py file.mka")
+
+header()
+
+if (len(sys.argv)!=2):
+    usage()
+    exit()
+
+ircode = sys.argv[1]
+
+#Crea
+## This Virtual Machine es Multipass
+# We first do one pass to build some structures
+# Then we interpret the code line by line
+
+#Global Vars
+debug = False
+lineno = 0
+eip = 0
+esp = []
+function_address = {}
+function_era = {}
+stack = []    # For reference, Linux allow stacks up to 2 megabytes of size
+globalstack = [0 for x in range(10)] # For reference, Linux allow stacks up to 2 megabytes of size
+callstack = []
+esptmp = 0
+
+#Auxiliary Functions
+
+def getValue(operand):
+    currentstack_base = sum(esp[:-1])
+    if operand.startswith("("):
+        index = re.search('([\d]+)',operand).group(1)
+        offset = int(index) - 1
+        if operand.startswith("(%STACK"):
+            operand = stack[currentstack_base+offset]
+        else:
+            operand = globalstack[offset]
+    
+    if (str(operand)=="true"):
+        operand = str(1)
+    elif (str(operand)=="false"):
+        operand = str(0)
+    
+    return operand
+
+def save_in(address,value):
+    currentstack_base = sum(esp[:-1])
+    index = re.search('([\d]+)',address).group(1)
+    offset = int(index) - 1
+    if address.startswith("(%STACK"):
+        stack[currentstack_base+offset] = str(value)
+    else:
+        globalstack[offset] = str(value)
+    
+if(debug):
+    print("\nFirst pass\n-----------------------------\n")
+    
+# In the first pass we build the function_adress and function_era structures
+firstpass = open(ircode,'r')
+for line in iter(firstpass):
+    lineno = lineno + 1
+    if line.startswith(".data"):
+        function_address["!QUIT"] = lineno-1
+    if line.startswith("_"):
+        function_name = re.search('_(.*):', line).group(1)
+        function_address[function_name] = lineno-1
+        if(debug):
+            print("A function %s at location %s" % (function_name,lineno-1))
+    if line.startswith("era_size_"):
+        regs = re.search('era_size_(.*):.*(\d)',line)
+        function_name = regs.group(1)
+        era_size = regs.group(2)
+        function_era[function_name] = int(era_size)
+        if(debug):
+            print("A function %s with %s variables" % (function_name,era_size))
+firstpass.close()
+
+if(debug):
+    print("\nSecond pass\n-----------------------------\n")
+
+# In the second pass we actually execute the code
+# We keep advacing the EIP until we reach the .data section
+secondpass = open(ircode,'r').readlines()
+while(secondpass[eip]!='.data:\n'):
+    instruction = secondpass[eip]
+    
+    #Python no maneja SWITCH/CASE structures. Tendra que ser un good old fashion if/elseif
+    
+    if instruction == '\n':
+        # THIS WORKS BASICALLY LIKE A NOP INSTRUCTION
+        # WE JUST INCREMENT THE EIP
+        print("%3s: NOP" % (eip))
+        eip += 1
+    elif instruction.startswith("_"):
+        # Ignore, labels are just for human consumers
+        nextstack_base = sum(esp)
+        currentstack_base = sum(esp[:-1])
+        
+        if(debug):
+            print("%3s: Starting the function %s" % (eip, instruction[1:-2]))
+            print("%3s: CURRENT_STACK_FRAME: %s NEXT_STACK_FRAME %s" % (eip, currentstack_base, nextstack_base))
+        # When a function starts we allocate the space needed for it
+        while(len(stack) < nextstack_base):
+            stack.append(0)
+        eip += 1
+    elif instruction.startswith("ERAS"):
+        regs = re.search('era_size_(.*)', instruction)
+        function_name = regs.group(1)[:-1]
+        era_size = function_era[function_name]
+        esptmp = era_size
+        if(debug):
+            print("%3s: Allocating %s spaces for %s" % (eip, era_size,function_name))
+        eip += 1
+    elif instruction.startswith("CALL"):
+        regs = re.search('CALL _(.*)', instruction)
+        function_name = regs.group(1)
+        jmp = function_address[function_name]
+        esp.append(esptmp)
+        if(debug):
+            print("%3s: Jumping to function %s at address %s" % (eip, function_name, jmp))
+        if function_name != "main":
+            callstack.append(eip+1)
+        else:
+            callstack.append(function_address["!QUIT"])
+        eip = jmp
+    elif instruction.startswith("PUSH"):
+        regs = re.search('PUSH (.*)', instruction)
+        argument = regs.group(1)
+        nextstack_base = sum(esp)
+        currentstack_base = sum(esp[:-1])
+        
+        #Case 1 WE GET A REFERENCE
+        if argument.startswith("("):
+            # We get the offset
+            index = re.search('([\d]+)',argument).group(1)
+            offset = int(index) - 1 
+            if argument.startswith("(%STACK"):
+                stack.append(stack[currentstack_base + offset])
+                if(debug):
+                    print("%3s: CURRENT_STACK_FRAME: %s NEXT_STACK_FRAME %s" % (eip, currentstack_base, nextstack_base))
+                    print("%3s: Pushing LOCAL VAL \"%s\" on index %s" % (eip, stack[currentstack_base + offset],str(currentstack_base + offset)))
+            else:
+                stack.append(globalstack[offset])
+                if(debug):
+                    print("%3s: Pushing GLOABL VAL \"%s\"" % (eip, globalstack[offset]))
+        #Case 2 WE GET A VALUE    
+        else:
+            stack.append(argument)
+    
+        if(debug):
+            print("%3s: Pushing %s" % (eip, argument))
+        eip = eip + 1
+    elif instruction.startswith("SADD"):
+        # ISUB OPERANDA OPERANDB
+        # a -1; ISUB 1 (%GLOBALS+1) (%STACK+4)
+        # B - A
+            
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandB = getValue(operandB)
+                
+        operation = (operandB[0:-1] + operandA[1:])
+        
+        save_in(result,operation)
+        eip = eip + 1;
+    elif instruction.startswith("IADD"):
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandA = int(float(operandA))
+        operandB = getValue(operandB)
+        operandB = int(float(operandB))
+        
+        operation = operandB + operandA
+        
+        save_in(result,int(operation))
+        eip = eip + 1
+    elif instruction.startswith("ISUB"):
+        # ISUB OPERANDA OPERANDB
+        # a -1; ISUB 1 (%GLOBALS+1) (%STACK+4)
+        # B - A
+        if(debug):
+            print("%3s: %s" % (eip, instruction.strip()))
+                
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandA = int(float(operandA))
+        operandB = getValue(operandB)
+        operandB = int(float(operandB))
+        
+        operation = operandB - operandA
+        
+        if(debug):
+            print("%3s: ISUB %s = %s - %s" % (eip, operation, operandB, operandA))
+        
+        save_in(result,int(operation))
+        eip = eip + 1;    
+    elif instruction.startswith("IMUL"):
+        # ISUB OPERANDA OPERANDB
+        # a -1; ISUB 1 (%GLOBALS+1) (%STACK+4)
+        # B - A
+            
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandA = int(float(operandA))
+        operandB = getValue(operandB)
+        operandB = int(float(operandB))
+        
+        operation = operandB * operandA
+        
+        save_in(result,int(operation))
+        eip = eip + 1;
+    elif instruction.startswith("IDIV"):
+        # ISUB OPERANDA OPERANDB
+        # a -1; ISUB 1 (%GLOBALS+1) (%STACK+4)
+        # B - A
+            
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandA = int(operandA)
+        operandB = getValue(operandB)
+        operandB = int(operandB)
+        
+        operation = operandB // operandA
+        
+        save_in(result,int(operation))
+        eip = eip + 1;
+    elif instruction.startswith("DADD"):
+        # ISUB OPERANDA OPERANDB
+        # a -1; ISUB 1 (%GLOBALS+1) (%STACK+4)
+        # B - A
+            
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandA = float(operandA)
+        operandB = getValue(operandB)
+        operandB = float(operandB)
+        
+        operation = operandB + operandA
+        
+        save_in(result,float(operation))
+        eip = eip + 1;    
+    elif instruction.startswith("DSUB"):
+        # ISUB OPERANDA OPERANDB
+        # a -1; ISUB 1 (%GLOBALS+1) (%STACK+4)
+        # B - A
+            
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandA = float(operandA)
+        operandB = getValue(operandB)
+        operandB = float(operandB)
+        
+        operation = operandB - operandA
+        
+        save_in(result,float(operation))
+        eip = eip + 1;     
+    elif instruction.startswith("DMUL"):
+        # ISUB OPERANDA OPERANDB
+        # a -1; ISUB 1 (%GLOBALS+1) (%STACK+4)
+        # B - A
+            
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandA = float(operandA)
+        operandB = getValue(operandB)
+        operandB = float(operandB)
+        
+        operation = operandB * operandA
+        
+        save_in(result,float(operation))
+        eip = eip + 1;
+    elif instruction.startswith("DDIV"):
+        # ISUB OPERANDA OPERANDB
+        # a -1; ISUB 1 (%GLOBALS+1) (%STACK+4)
+        # B - A
+            
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandA = float(operandA)
+        operandB = getValue(operandB)
+        operandB = float(operandB)
+        
+        operation = operandB / operandA
+        
+        save_in(result,float(operation))
+        eip = eip + 1;
+    elif instruction.startswith("ORVL"):
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandA = bool(int(operandA))
+        operandB = getValue(operandB)
+        operandB = bool(int(operandB))
+        
+        operation = (operandA|operandB)
+        
+        save_in(result,int(operation))
+        eip = eip + 1
+    elif instruction.startswith("ANDV"):
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandA = bool(int(operandA))
+        operandB = getValue(operandB)
+        operandB = bool(int(operandB))
+        
+        operation = (operandA&operandB)
+        
+        save_in(result,int(operation))
+        eip = eip + 1
+    elif instruction.startswith("EQLV"):
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandA = float(operandA)
+        operandB = getValue(operandB)
+        operandB = float(operandB)
+        
+        operation = (operandA==operandB)
+        
+        save_in(result,int(operation))
+        eip = eip + 1
+    elif instruction.startswith("NEQL"):
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandA = float(operandA)
+        operandB = getValue(operandB)
+        operandB = float(operandB)
+        
+        operation = (operandA!=operandB)
+        
+        save_in(result,int(operation))
+        eip = eip + 1
+    elif instruction.startswith("EQST"):
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandB = getValue(operandB)
+        
+        operation = (operandA==operandB)
+        
+        save_in(result,int(operation))
+        eip = eip + 1
+    elif instruction.startswith("NEQS"):
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandB = getValue(operandB)
+        
+        operation = (operandA!=operandB)
+        
+        save_in(result,int(operation))
+        eip = eip + 1
+    elif instruction.startswith("ENDF"):
+        # This opcode is for when we hit the end of a fuction without a return value
+        # Clean the stack
+        while(len(stack) > sum(esp[:-1])):
+            stack.pop()
+        esp.pop()
+        
+        if(debug):
+            print("%3s: GLOBALSTACK: %s" % (eip, globalstack))
+            print("%3s: STACK: %s" % (eip, stack))
+            print("%3s: CALLSTACK %s" % (eip, callstack))
+        
+        stack.append(0)
+        
+        eip = callstack.pop()
+    elif instruction.startswith("RETV"):
+        returnvalue = re.search('RETV\s(.*)',instruction).group(1)
+        
+        #Case 1 we get a reference to somewhere in the stack
+        if returnvalue.startswith("("):
+            index = re.search('([\d]+)',returnvalue).group(1)
+            offset = int(index) - 1
+            if returnvalue.startswith("(%STACK"):
+                returnvalue = stack[currentstack_base+offset]
+            else:
+                returnvalue = globalstack[offset]
+        if(debug):
+            print("%3s: GLOBALSTACK: %s" % (eip, globalstack))
+            print("%3s: STACK: %s" % (eip, stack))
+            print("%3s: CALLSTACK %s" % (eip, callstack))
+        
+        # Clean the stack
+        while(len(stack) > sum(esp[:-1])):
+            stack.pop()
+        esp.pop()
+
+        # Do one last push before returning to instruction
+        stack.append(returnvalue)
+        if(debug):
+            print("%3s: RETV %s" % (eip, returnvalue))
+            print("%3s: GLOBALSTACK: %s" % (eip, globalstack))
+            print("%3s: STACK: %s" % (eip, stack))
+            print("%3s: CALLSTACK %s" % (eip, callstack))
+        
+        
+        eip = callstack.pop()
+    elif instruction.startswith("POPV"):
+        variable_address = re.search('POPV\s(.*)',instruction).group(1)
+        currentstack_base = sum(esp[:-1])
+        returnvalue = stack.pop()
+        
+        #El argumento de POP siempre es una direccion del stack local
+        #no hay necesidad de checar por gloabl
+        index = re.search('([\d]+)',variable_address).group(1)
+        offset = int(index) - 1
+        stack[currentstack_base+offset] = returnvalue
+        if(debug):
+            print("%3s: POPV %s, STACK: %s" % (eip, returnvalue, stack))
+            nextstack_base = sum(esp)
+            currentstack_base = sum(esp[:-1])
+            print("%3s: CURRENT_STACK_FRAME: %s NEXT_STACK_FRAME %s" % (eip, currentstack_base, nextstack_base))
+        eip = eip + 1
+    elif instruction.startswith("MOVE"):
+        # Move es la operacion de asignacion
+        # Tiene dos operandos. A y B. B = A
+        # B puede ser referencia local o global
+        # A puede ser constante, referencia local o global
+        
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        currentstack_base = sum(esp[:-1])
+        
+        #La asignacion es por valor, entonces sacamos el valor de A
+        #Case 1.a WE GET A REFERENCE on A
+        if operandA.startswith("("):
+            index = re.search('([\d]+)',operandA).group(1)
+            offset = int(index) - 1
+            if operandA.startswith("(%STACK"):
+                operandA = stack[currentstack_base+offset]
+            else:
+                operandA = globalstack[offset]
+        # Caso 2. Si no es por referencia lo dejamos como viene
+        
+        # B es siempre una referencia local o global
+        index = re.search('([\d]+)',operandB).group(1)
+        offset = int(index) - 1
+        if operandB.startswith("(%STACK"):
+            stack[currentstack_base+offset] = operandA
+        else:
+            globalstack[offset] = operandA
+            
+        if(debug):
+            print("%3s: MOVE %s %s" % (eip, operandA, operandB))
+        eip = eip + 1        
+    elif instruction.startswith("LTVL"):
+        # a<9999 = LTVL 9999 (%GLOBALS+1) (%STACK+2)
+        #B<A
+        
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandB = getValue(operandB)
+        
+        operation = float(operandB) < float(operandA)
+        
+        save_in(result,int(operation))
+        eip = eip +1
+    elif instruction.startswith("LTEV"):
+        # a<9999 = LTVL 9999 (%GLOBALS+1) (%STACK+2)
+        #B<A
+        
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandB = getValue(operandB)
+        
+        operation = float(operandB) <= float(operandA)
+        
+        save_in(result,int(operation))
+        eip = eip +1
+    elif instruction.startswith("GTVL"):
+        # num>5000 = GTL 5000 (%GLOBALS+1) (%STACK+3)
+        # B>A
+        
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandB = getValue(operandB)
+        
+        operation = float(operandB) > float(operandA)
+                
+        save_in(result,int(operation))
+        eip = eip +1
+    elif instruction.startswith("GTEV"):
+        # num>5000 = GTL 5000 (%GLOBALS+1) (%STACK+3)
+        # B>A
+        
+        regs =re.findall(r'(\S+)', instruction)
+        operandA = regs[1]
+        operandB = regs[2]
+        result = regs[3]
+        
+        operandA = getValue(operandA)
+        operandB = getValue(operandB)
+        
+        operation = float(operandB) >= float(operandA)
+                
+        save_in(result,int(operation))
+        eip = eip +1
+    elif instruction.startswith("GTOF"):
+        regs =re.findall(r'(\S+)', instruction)
+        test = regs[1]
+        jmp = int(regs[2]) - 1
+        
+        test = getValue(test)
+        test = int(test)
+        test = bool(test)
+                
+        if(test):
+            eip = eip+1
+        else:
+            eip = jmp
+    elif instruction.startswith("GOTO"):
+        regs =re.findall(r'(\S+)', instruction)
+        jmp = int(regs[1]) - 1
+        
+        #unconditional jump bro
+        eip = jmp       
+    elif instruction.startswith("IPUT"):
+        # IPUT operandA
+        # A can be either a constant or a reference
+        if(debug):
+            print("%3s: %s" % (eip, instruction.strip()))
+        
+        regs = re.search('IPUT (.*)', instruction)
+        
+        operandA = regs.group(1)
+        operandA = getValue(operandA)
+        operandA = int(operandA)
+
+        print(operandA)
+        eip = eip + 1;
+    elif instruction.startswith("DPUT"):
+        # IPUT operandA
+        # A can be either a constant or a reference
+        if(debug):
+            print("%3s: %s" % (eip, instruction.strip()))
+        
+        regs = re.search('DPUT (.*)', instruction)
+        
+        operandA = regs.group(1)
+        operandA = getValue(operandA)
+        operandA = float(operandA)
+
+        print(operandA)
+        eip = eip + 1;
+    elif instruction.startswith("BPUT"):
+        # IPUT operandA
+        # A can be either a constant or a reference
+        if(debug):
+            print("%3s: %s" % (eip, instruction.strip()))
+        
+        regs = re.search('BPUT (.*)', instruction)
+        
+        operandA = regs.group(1)
+        operandA = getValue(operandA)
+        operandA = bool(int(operandA))
+
+        print(operandA)
+        eip = eip + 1;
+    elif instruction.startswith("SPUT"):
+        # IPUT operandA
+        # A can be either a constant or a reference
+        if(debug):
+            print("%3s: %s" % (eip, instruction.strip()))
+
+        regs = re.search('SPUT (.*)', instruction)
+
+        operandA = regs.group(1)
+        operandA = getValue(operandA)
+        operandA = str(operandA)
+            
+        print(operandA[1:-1])
+        eip = eip + 1;    
+    else:
+        print("%3s: ERROR NO ENTIENDO INSTRUCCION\n\n%s" % (eip,instruction.strip()))
+        exit()
+
+exit_status = stack.pop()
+
+print("\nExited program with status: %s" % exit_status)

@@ -165,7 +165,7 @@
 #include "util/hash.c"
 #define YYPARSER 
 #define YYSTYPE char *
-#define VERBOSE 0	
+#define VERBOSE 1
 #define MAX_TMP_VARIABLES 1024
 #define MAX_PROGRAM_SIZE 1000
 
@@ -232,6 +232,12 @@ void DBG_PrintIRCode(){
 		printf("%5d: %s\n",i, IRCode[i]);
 }
 
+int PRG_SaveIRCode(){ 
+	for(int i=0;i<program_counter;i++)
+		fprintf(outputFile,"%s\n",IRCode[i]);
+  return 1;
+}
+
 /****************************************************************************/
 /**                                                                        **/
 /**                  ATTRIBUTE GRAMMAR FUNCTIONS                           **/
@@ -246,9 +252,8 @@ char * PRG_SemanticCube(char* op, char *operand1, char *operand2){
 	char *result_type;
 	char *opcode;
 	opcode = strdup("ERR");
-	
 	// (boolean, boolean)
-	if(strcmp(operand1,"boolean")==0 && strcmp(operand2,"boolean")){
+	if(strcmp(operand1,"boolean")==0 && strcmp(operand2,"boolean")==0){
 		if(strcmp(op,"==")==0){
 			opcode = strdup("EQLV");
 			result_type = strdup("boolean");
@@ -529,7 +534,10 @@ void PRG_GetSymbol(char *identifierName, char *scopeName, char *symbolKind){
 	//Variables are search'd in both the local and global scope
 	response_local  = member(SymbolTable, identifierName, scopeName);
 	response_global = member(SymbolTable, identifierName, "global");
-	if(response_local==0 && response_global==0){
+	int response_ary_local =  member(SymbolTable, concat(identifierName,"_0"), scopeName);
+	int response_ary_global = member(SymbolTable, concat(identifierName,"_0"), "global");
+	
+	if( response_local==0 && response_global==0 && response_ary_local==0 && response_ary_global==0 ){
 		printf("LINE: %-4d CALL: PRG_GetSymbol(%s,%s,%s)\n", g_lineno,identifierName, scopeName, symbolKind);
 		printf("FATAL: Trying to access undeclared variable\n");
 		exit(EXIT_FAILURE);
@@ -574,11 +582,14 @@ void PRG_Initialize(){
 void pushType(char *value, char *symbolKind){
 	char *factorType;
 	
+	
 	if(strcmp(symbolKind,"const")==0){ // then is a constant
 		factorType = getTypeFromValue(value);
 		//printf("Retrived type for %s is %s\n\n", value, factorType);
 	}else{ // then is a variable or a function
 		factorType = memberType(SymbolTable, value, PRG_GetScope());
+		if(!factorType)
+			factorType = memberType(SymbolTable, concat(value,"_0"), PRG_GetScope());
 		//printf("Retrived type for %s is %s in scope: %s\n\n", value, factorType, PRG_GetScope());
 	}
 		
@@ -589,12 +600,16 @@ void pushType(char *value, char *symbolKind){
 void pushOperand(char *operand, char *kind){
 	int offset;
 	char offset_string[MAX_PROGRAM_SIZE];
+	
+	
+
 	//A lo mejor deberia checar que sea permitido. Pero no pasarian por flex ni bison...
 	if(strcmp(kind,"func")==0){
 		stackPush(&operandStack, operand);
 	}else if(strcmp(kind,"const")==0){
 		stackPush(&operandStack, operand);
 	}else{
+		
 	//Else means that it is not a function, it is not a constnat.
 	//So it means it must be within reach of the stack.
 	//We can calculate that if we know the index of the variable in the stack
@@ -602,15 +617,16 @@ void pushOperand(char *operand, char *kind){
 	sprintf(offset_string, "%d", offset);
 
 	int response_global = member(SymbolTable, operand, "global");
+	int response_local = member(SymbolTable, operand, PRG_GetScope());
 	
-	if(response_global){
+	if(response_local){
+			offset = memberNumber(SymbolTable, operand, PRG_GetScope());	
+			sprintf(offset_string, "%d", offset);
+			operand = concat("(",concat("\%STACK",concat("+",concat(offset_string,")"))));
+	}else if(response_global){
 		offset = memberNumber(SymbolTable, operand, "global");	
 		sprintf(offset_string, "%d", offset);
 		operand = concat("(",concat("\%GLOBALS",concat("+",concat(offset_string,")"))));
-	}else{
-		offset = memberNumber(SymbolTable, operand, PRG_GetScope());	
-		sprintf(offset_string, "%d", offset);
-		operand = concat("(",concat("\%STACK",concat("+",concat(offset_string,")"))));
 	}
 	
 	stackPush(&operandStack, operand);	
@@ -620,10 +636,11 @@ void pushOperand(char *operand, char *kind){
 void EXP_PushOperand(char *operand, char *symbolKind){
 	//TO-DO Check for NULLS
 	
+
 	//Check for the existance of a variable before even continuing.
 	if(strcmp(symbolKind,"var")==0)
 		PRG_GetSymbol(operand, PRG_GetScope(), "var"); 
-	
+
 	//Later is the same for both expressions
 	pushType(operand, symbolKind); 
 	pushOperand(operand, symbolKind);
@@ -791,6 +808,57 @@ void IR_MakeIOREAD(char *identifier){
 	IR_AddIOREAD(identifier);
 }
 
+void IR_MakeARGYASSIGN(char *identifier){
+	char *identifier_type;
+	char *expression_type;
+	char *expression;
+	
+	char *index_expression;
+	//Semantic chec
+	//Look for the identifier to be declared previously
+	PRG_GetSymbol(concat(identifier,"_0"), PRG_GetScope(), "var"); 
+	
+	identifier_type = getTypeFromSymbol(concat(identifier,"_0"), PRG_GetScope());
+	expression_type = stackPop(&typeStack);
+	if(strcmp(identifier_type,expression_type)!=0){
+		printf("LINE: %-4d CALL: IR_MakeARGYASSIGN(%s)\n", g_lineno, identifier);
+		printf("FATAL: Type mismatch. Trying to assign %s to an array \"%s\" of type %s \n", expression_type, identifier, identifier_type);
+		exit(EXIT_FAILURE);
+	}
+	
+	//The expression to assign
+	expression = stackPop(&operandStack);
+	
+	int offset;	
+	char offset_string[MAX_PROGRAM_SIZE];
+
+	//This gives use the base address for the array
+	int response_global = member(SymbolTable, concat(identifier,"_0"), "global");
+	int response_local = member(SymbolTable, concat(identifier,"_0"), PRG_GetScope());
+	if(response_local){
+		offset = memberNumber(SymbolTable, concat(identifier,"_0"), PRG_GetScope());	
+		sprintf(offset_string, "%d", offset);
+		identifier = concat("(",concat("\%STACK",concat("+",concat(offset_string,")"))));
+	}else if(response_global){
+		offset = memberNumber(SymbolTable, concat(identifier,"_0"), "global");	
+		sprintf(offset_string, "%d", offset);
+		identifier = concat("(",concat("\%GLOBALS",concat("+",concat(offset_string,")"))));
+	}
+	
+	//Now for the index
+	index_expression = stackPop(&operandStack);
+	stackPop(&typeStack);; // Don't do anything with it, just take it out
+	
+	// "= " + expression + " " + identifier
+	// = (%STACK+3) (%STACK+3[index])
+	identifier = concat(identifier,concat("[", concat(index_expression,"]")));
+	char * instruction = concat("MOVE ", expression);
+	instruction = concat(instruction, " ");
+	instruction = concat(instruction, identifier);
+	
+	IRCode[program_counter] = instruction;
+	program_counter++;
+}
 void IR_MakeASSIGN(char *identifier){
 	char *identifier_type;
 	char *expression_type;
@@ -821,15 +889,16 @@ void IR_MakeASSIGN(char *identifier){
 	char offset_string[MAX_PROGRAM_SIZE];
 
 	int response_global = member(SymbolTable, identifier, "global");
+	int response_local = member(SymbolTable, identifier, PRG_GetScope());
 	
-	if(response_global){
-		offset = memberNumber(SymbolTable, identifier, "global");	
-		sprintf(offset_string, "%d", offset);
-		identifier = concat("(",concat("\%GLOBALS",concat("+",concat(offset_string,")"))));
-	}else{
+	if(response_local){
 		offset = memberNumber(SymbolTable, identifier, PRG_GetScope());	
 		sprintf(offset_string, "%d", offset);
 		identifier = concat("(",concat("\%STACK",concat("+",concat(offset_string,")"))));
+	}else if(response_global){
+		offset = memberNumber(SymbolTable, identifier, "global");	
+		sprintf(offset_string, "%d", offset);
+		identifier = concat("(",concat("\%GLOBALS",concat("+",concat(offset_string,")"))));
 	}
 
 	//Code generation
@@ -865,7 +934,7 @@ void IR_MakeENDWHILE(){
 	// Rellenar IR pasado con program_counter+1 (uno despues del goto incondicional)
 	int while_condition_address = int_stackPop(&jumpStack);
 	char jmp_address[MAX_PROGRAM_SIZE+1];
-	sprintf(jmp_address, " %d", program_counter+1);
+	sprintf(jmp_address, " %d", program_counter + 2);
 	
 	char *while_condition_instruction = IRCode[while_condition_address];
 	while_condition_instruction = concat(while_condition_instruction, jmp_address);
@@ -874,7 +943,7 @@ void IR_MakeENDWHILE(){
 	// POP jumpStack
 	// Generar instruccion de goto incondicional al poped
 	int while_beginning_address = int_stackPop(&jumpStack);
-	sprintf(jmp_address, " %d", while_beginning_address);
+	sprintf(jmp_address, " %d", while_beginning_address +1);
 	char *instruction = concat("GOTO ", jmp_address);
 	IRCode[program_counter] = instruction;
 	program_counter++;
@@ -911,7 +980,7 @@ void IR_MakeELSEIF(){
 	//SACAR FALSO DE PILA-DE-SALTOS
 	char *previous_if_instruction;
 	char jmp_address[MAX_PROGRAM_SIZE];
-	sprintf(jmp_address, "%d", program_counter);
+	sprintf(jmp_address, "%d", program_counter+1);
 
 	previous_if_instruction = IRCode[previous_if_address];
 	
@@ -929,7 +998,7 @@ void IR_MakeENDIF(){
 	char jmp_address[MAX_PROGRAM_SIZE];
 	
 	char *instruction = IRCode[previous_if_address];
-	sprintf(jmp_address, "%d", program_counter);		
+	sprintf(jmp_address, "%d", program_counter+1);		
 	
 	char *new_instruction_tmp1;
 	char *new_instruction;
@@ -1014,12 +1083,11 @@ void IR_MakeCALL(char *identifier){
 	sprintf(suffix_for_temporal_variable, "%d", temporals_counter++);
 	temporal_variable = concat("T", suffix_for_temporal_variable);
 	
-	PRG_SaveSymbol(getTypeFromSymbol(PRG_GetScope(), PRG_GetScope()), temporal_variable, PRG_GetScope(), "tmp"); 
+	PRG_SaveSymbol(getTypeFromSymbol(identifier, "global"), temporal_variable, PRG_GetScope(), "tmp"); 
 	
 	EXP_PushOperand(temporal_variable, PRG_GetScope());
 	temporal_variable = stackPop(&operandStack);
 	stackPush(&operandStack,temporal_variable);
-	
 	instruction = concat("CALL _", identifier);
 	IRCode[program_counter] = instruction;
 	program_counter++;
@@ -1073,6 +1141,18 @@ void IR_MakeEXP(){
 	IR_AddEXP(operator,operand1,operand2,temporal_variable);
 }
 
+void save_ary_symbol(char *type, char *identifier, char *range){
+	char identifier_index[MAX_TMP_VARIABLES+1];
+	int rangeindex;
+	char *array_identifier;
+	rangeindex = atoi(range);
+	for(int i=0;i<rangeindex;i++){
+		sprintf(identifier_index, "_%d", i);
+		array_identifier = concat(identifier,identifier_index);
+		PRG_SaveSymbol(type, array_identifier, PRG_GetScope(), "var");
+		free(array_identifier);
+	}
+}
 
 
 /* Enabling traces.  */
@@ -1106,7 +1186,7 @@ typedef int YYSTYPE;
 
 
 /* Line 216 of yacc.c.  */
-#line 1110 "y.tab.c"
+#line 1190 "y.tab.c"
 
 #ifdef short
 # undef short
@@ -1321,7 +1401,7 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  6
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   158
+#define YYLAST   173
 
 /* YYNTOKENS -- Number of terminals.  */
 #define YYNTOKENS  45
@@ -1409,9 +1489,9 @@ static const yytype_int8 yyrhs[] =
       -1,     3,    38,    76,    66,    39,    44,    63,     5,    68,
       63,     4,    67,    -1,    -1,    -1,    -1,    -1,     9,    71,
       38,    76,    70,    39,    44,    63,    10,    -1,    -1,    18,
-      24,    76,    -1,    18,    41,    19,    42,    24,    76,    -1,
+      24,    76,    -1,    18,    41,    76,    42,    24,    76,    -1,
       11,    74,    -1,    12,    76,    -1,    75,    -1,    75,    41,
-      19,    42,    -1,    18,    -1,    -1,    76,    78,    77,    79,
+      76,    42,    -1,    18,    -1,    -1,    76,    78,    77,    79,
       -1,    79,    -1,    29,    -1,    30,    -1,    31,    -1,    32,
       -1,    33,    -1,    34,    -1,    36,    -1,    37,    -1,    -1,
       79,    81,    80,    82,    -1,    82,    -1,    26,    -1,    25,
@@ -1426,16 +1506,16 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint16 yyrline[] =
 {
-       0,   964,   964,   964,   965,   965,   966,   969,   970,   972,
-     974,   975,   977,   977,   977,   979,   979,   980,   982,   982,
-     984,   985,   987,   990,   991,   993,   994,   996,   996,   996,
-     996,   999,  1000,  1002,  1002,  1002,  1002,  1002,  1002,  1004,
-    1005,  1007,  1008,  1009,  1011,  1011,  1012,  1014,  1015,  1017,
-    1018,  1020,  1021,  1023,  1025,  1025,  1026,  1028,  1028,  1028,
-    1028,  1028,  1028,  1028,  1028,  1030,  1030,  1031,  1032,  1032,
-    1034,  1034,  1035,  1035,  1036,  1038,  1039,  1040,  1041,  1042,
-    1044,  1044,  1044,  1045,  1046,  1047,  1049,  1049,  1052,  1052,
-    1053,  1053,  1055
+       0,  1044,  1044,  1044,  1045,  1045,  1046,  1049,  1050,  1052,
+    1054,  1055,  1057,  1057,  1057,  1059,  1059,  1060,  1062,  1062,
+    1064,  1065,  1067,  1070,  1071,  1073,  1074,  1076,  1076,  1076,
+    1076,  1079,  1080,  1082,  1082,  1082,  1082,  1082,  1082,  1084,
+    1085,  1087,  1088,  1089,  1091,  1091,  1092,  1094,  1095,  1097,
+    1098,  1100,  1101,  1103,  1105,  1105,  1106,  1108,  1108,  1108,
+    1108,  1108,  1108,  1108,  1108,  1110,  1110,  1111,  1112,  1112,
+    1114,  1114,  1115,  1115,  1116,  1118,  1119,  1120,  1121,  1122,
+    1124,  1124,  1124,  1125,  1126,  1127,  1129,  1129,  1132,  1132,
+    1133,  1133,  1135
 };
 #endif
 
@@ -1544,32 +1624,32 @@ static const yytype_int16 yydefgoto[] =
 #define YYPACT_NINF -95
 static const yytype_int16 yypact[] =
 {
-      -2,   -15,    21,    72,   -95,   -17,   -95,   116,    18,   -95,
-      16,   -95,   -95,   -95,   -95,     2,    -5,    33,   116,    18,
-     -95,     1,    18,    22,   -95,    36,    24,   -95,   -95,   -95,
-     -95,   -95,    62,    66,    52,   -95,   -95,    57,   116,    68,
-      58,   -95,    87,    67,   116,   -95,    55,   -95,    74,    27,
-     -95,    95,    27,   -19,   -95,    55,   117,   -95,   -95,   -95,
-      76,    79,    81,    82,    27,    85,   -95,   -95,   -95,   -95,
-     -95,   -95,   -95,    86,    23,    14,    60,   -95,   -95,   -95,
-      96,   -95,   -95,    23,    27,   118,    98,   131,   117,   -95,
-     -95,   -95,   -95,   -95,    23,    27,   120,   -95,   -95,   -95,
+      -2,   -15,    21,    47,   -95,   -17,   -95,   116,    18,   -95,
+      16,   -95,   -95,   -95,   -95,     2,     1,    38,   116,    18,
+     -95,     5,    18,    24,   -95,    35,    33,   -95,   -95,   -95,
+     -95,   -95,    61,    65,    42,   -95,   -95,    49,   116,    46,
+      48,   -95,    71,    50,   116,   -95,    54,   -95,    52,    29,
+     -95,    77,    29,   -19,   -95,    54,   117,   -95,   -95,   -95,
+      67,    72,    73,    76,    29,    63,   -95,   -95,   -95,   -95,
+     -95,   -95,   -95,    64,   135,    14,    27,   -95,   -95,   -95,
+      81,   -95,   -95,   135,    29,    29,    83,   104,   117,   -95,
+     -95,   -95,   -95,   -95,   135,    29,    29,   -95,   -95,   -95,
      -95,   -95,   -95,   -95,   -95,   -95,   -95,   -95,   -95,   -95,
-     -95,    27,    23,    99,    27,   -95,   101,    14,   100,    27,
-      27,    27,    27,    23,   119,    14,   105,   102,   103,   107,
-     -95,    14,    60,   -95,   -95,   109,    27,   -95,    27,   117,
-     -95,   108,    23,    14,    71,   117,   -95,   -95,    20,   -95,
+     -95,    29,   135,   107,    29,   -95,    84,    14,   121,    29,
+      29,    29,    29,   135,    98,    14,    88,    91,   101,   103,
+     -95,    14,    27,   -95,   -95,   108,    29,   -95,    29,   117,
+     -95,   102,   135,    14,    70,   117,   -95,   -95,    20,   -95,
      117,   -95,   106,   -95,   -95
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int16 yypgoto[] =
 {
-     -95,   -95,   -95,   -95,   127,   -95,   147,   136,    -7,   -95,
-     -95,   -95,   -95,   -95,   110,   111,   -12,   -11,   -42,   -52,
-     -95,   -95,     0,   -95,   -95,   -95,   -95,   -95,   -95,   104,
-     -95,   -50,   -95,   -95,   -94,   -95,   -95,    38,   -95,   -95,
-     -95,   -31,   -95,   -95,   -46,   -95,   -95,   -95,   -95
+     -95,   -95,   -95,   -95,   126,   -95,   153,   144,    -7,   -95,
+     -95,   -95,   -95,   -95,   118,   114,   -12,   -11,   -42,   -52,
+     -95,   -95,     8,   -95,   -95,   -95,   -95,   -95,   -95,   119,
+     -95,   -50,   -95,   -95,   -94,   -95,   -95,    53,   -95,   -95,
+     -95,   -63,   -95,   -95,   -46,   -95,   -95,   -95,   -95
 };
 
 /* YYTABLE[YYPACT[STATE-NUM]].  What to do in state STATE-NUM.  If
@@ -1582,39 +1662,43 @@ static const yytype_int16 yytable[] =
       62,   117,    83,    23,    89,    84,     5,    26,    18,    62,
       62,     1,    28,    88,    94,    28,    11,    12,    13,    14,
      125,     6,    85,    48,    18,   131,    10,    42,    49,    50,
-     151,    51,    52,    42,   112,    24,    89,    21,    53,   106,
-     107,    29,    62,    23,   143,    65,    66,    67,    68,    69,
-      70,    25,    97,    98,    99,   100,   101,   102,    48,   103,
-     104,   123,    31,    49,    50,    71,    51,    52,    33,    11,
-      12,    13,    14,    53,    48,   146,   147,    32,    -4,    49,
-      50,    34,    51,    52,    35,     1,   142,   109,   110,    53,
-     133,   134,    89,    62,    36,    38,    89,   144,    62,    62,
-      89,    44,    62,   148,    62,    45,    62,    43,   152,    48,
-     153,    46,    64,    81,    49,    50,    90,    51,    52,    91,
-      48,    92,    93,   -86,    53,    49,    50,    96,    51,    52,
-      11,    12,    13,    14,   111,    53,   114,   113,   115,   118,
-     128,   124,   130,   136,   137,   138,   140,   139,   141,    30,
-       9,    22,   145,   154,    47,    82,     0,    55,   132
+     151,    51,    52,    42,   112,   113,    89,    21,    53,   106,
+     107,    24,    62,    23,   143,    29,   118,    65,    66,    67,
+      68,    69,    70,    -4,   109,   110,    25,    48,   133,   134,
+       1,   123,    49,    50,    31,    51,    52,    71,    11,    12,
+      13,    14,    53,    48,   146,   147,    32,    33,    49,    50,
+      34,    51,    52,    35,    36,    43,   142,    38,    53,    45,
+      64,    44,    89,    62,    46,    81,    89,   144,    62,    62,
+      89,   -86,    62,   148,    62,    96,    62,    90,   152,    48,
+     153,   115,    91,    92,    49,    50,    93,    51,    52,   111,
+      48,   114,   136,   128,    53,    49,    50,   137,    51,    52,
+      11,    12,    13,    14,   138,    53,    97,    98,    99,   100,
+     101,   102,   140,   103,   104,   139,   145,   141,    30,   124,
+      97,    98,    99,   100,   101,   102,     9,   103,   104,    22,
+      55,   154,    47,   130,    97,    98,    99,   100,   101,   102,
+      82,   103,   104,   132
 };
 
-static const yytype_int16 yycheck[] =
+static const yytype_uint8 yycheck[] =
 {
       46,    95,    52,    15,    56,    24,    21,    18,     6,    55,
       56,    13,    19,    55,    64,    22,    14,    15,    16,    17,
      114,     0,    41,     3,     6,   119,    43,    38,     8,     9,
-      10,    11,    12,    44,    84,    40,    88,    21,    18,    25,
-      26,    40,    88,    55,   138,    18,    19,    20,    21,    22,
-      23,    18,    29,    30,    31,    32,    33,    34,     3,    36,
-      37,   111,    40,     8,     9,    38,    11,    12,    44,    14,
-      15,    16,    17,    18,     3,     4,     5,    41,     6,     8,
-       9,    19,    11,    12,    18,    13,   136,    27,    28,    18,
-     121,   122,   144,   139,    42,    38,   148,   139,   144,   145,
-     152,    43,   148,   145,   150,    18,   152,    39,   150,     3,
-       4,    44,    38,    18,     8,     9,    40,    11,    12,    40,
-       3,    40,    40,    38,    18,     8,     9,    41,    11,    12,
-      14,    15,    16,    17,    38,    18,    38,    19,     7,    19,
-      39,    42,    42,    24,    39,    43,    39,    44,    39,    22,
-       3,    15,    44,   153,    44,    51,    -1,    46,   120
+      10,    11,    12,    44,    84,    85,    88,    21,    18,    25,
+      26,    40,    88,    55,   138,    40,    96,    18,    19,    20,
+      21,    22,    23,     6,    27,    28,    18,     3,   121,   122,
+      13,   111,     8,     9,    40,    11,    12,    38,    14,    15,
+      16,    17,    18,     3,     4,     5,    41,    44,     8,     9,
+      19,    11,    12,    18,    42,    39,   136,    38,    18,    18,
+      38,    43,   144,   139,    44,    18,   148,   139,   144,   145,
+     152,    38,   148,   145,   150,    41,   152,    40,   150,     3,
+       4,     7,    40,    40,     8,     9,    40,    11,    12,    38,
+       3,    38,    24,    39,    18,     8,     9,    39,    11,    12,
+      14,    15,    16,    17,    43,    18,    29,    30,    31,    32,
+      33,    34,    39,    36,    37,    44,    44,    39,    22,    42,
+      29,    30,    31,    32,    33,    34,     3,    36,    37,    15,
+      46,   153,    44,    42,    29,    30,    31,    32,    33,    34,
+      51,    36,    37,   120
 };
 
 /* YYSTOS[STATE-NUM] -- The (internal number of the) accessing
@@ -1632,7 +1716,7 @@ static const yytype_uint8 yystos[] =
       71,    18,    74,    76,    24,    41,    90,    55,    63,    64,
       40,    40,    40,    40,    76,    87,    41,    29,    30,    31,
       32,    33,    34,    36,    37,    78,    25,    26,    81,    27,
-      28,    38,    76,    19,    38,     7,    66,    79,    19,    77,
+      28,    38,    76,    76,    38,     7,    66,    79,    76,    77,
       80,    83,    84,    76,    42,    79,    91,    92,    39,    88,
       42,    79,    82,    86,    86,    70,    24,    39,    43,    44,
       39,    39,    76,    79,    63,    44,     4,     5,    63,    67,
@@ -2451,183 +2535,193 @@ yyreduce:
   switch (yyn)
     {
         case 2:
-#line 964 "yacc.y"
+#line 1044 "yacc.y"
     { PRG_Initialize(); }
     break;
 
   case 3:
-#line 964 "yacc.y"
-    { DBG_PrintSymbolTable(SymbolTable); DBG_PrintIRCode(); }
+#line 1044 "yacc.y"
+    { DBG_PrintSymbolTable(SymbolTable); DBG_PrintIRCode(); PRG_SaveIRCode(); }
     break;
 
   case 4:
-#line 965 "yacc.y"
+#line 1045 "yacc.y"
     { PRG_Initialize(); }
     break;
 
   case 6:
-#line 966 "yacc.y"
+#line 1046 "yacc.y"
     { PRG_ERAUpdate(); }
     break;
 
   case 12:
-#line 977 "yacc.y"
+#line 1057 "yacc.y"
     { IR_MakeFUNCTION((yyvsp[(4) - (4)])); PRG_SetScope((yyvsp[(4) - (4)])); PRG_SaveSymbol((yyvsp[(2) - (4)]), (yyvsp[(4) - (4)]), "global", "func");  }
     break;
 
   case 13:
-#line 977 "yacc.y"
+#line 1057 "yacc.y"
     { IR_MakeFUNCTIONEND(); }
     break;
 
   case 22:
-#line 987 "yacc.y"
+#line 1067 "yacc.y"
     { PRG_SaveSymbol((yyvsp[(1) - (2)]), (yyvsp[(2) - (2)]), PRG_GetScope(), "param"); }
     break;
 
   case 25:
-#line 993 "yacc.y"
+#line 1073 "yacc.y"
     { PRG_SaveSymbol((yyvsp[(1) - (2)]), (yyvsp[(2) - (2)]), PRG_GetScope(), "var"); }
     break;
 
+  case 26:
+#line 1074 "yacc.y"
+    { save_ary_symbol((yyvsp[(1) - (5)]),(yyvsp[(2) - (5)]),(yyvsp[(4) - (5)])); }
+    break;
+
   case 41:
-#line 1007 "yacc.y"
+#line 1087 "yacc.y"
     { IR_MakeIF(); }
     break;
 
   case 42:
-#line 1008 "yacc.y"
+#line 1088 "yacc.y"
     { IR_MakeENDIF(); }
     break;
 
   case 43:
-#line 1009 "yacc.y"
+#line 1089 "yacc.y"
     { IR_MakeELSEIF(); }
     break;
 
   case 44:
-#line 1011 "yacc.y"
+#line 1091 "yacc.y"
     { IR_MakeWHILE(); }
     break;
 
   case 45:
-#line 1011 "yacc.y"
+#line 1091 "yacc.y"
     { IR_MakeENDWHILE(); }
     break;
 
   case 46:
-#line 1012 "yacc.y"
+#line 1092 "yacc.y"
     { int_stackPush(&jumpStack, program_counter); }
     break;
 
   case 47:
-#line 1014 "yacc.y"
+#line 1094 "yacc.y"
     { IR_MakeASSIGN((yyvsp[(1) - (3)])); }
     break;
 
+  case 48:
+#line 1095 "yacc.y"
+    { IR_MakeARGYASSIGN((yyvsp[(1) - (6)])); }
+    break;
+
   case 49:
-#line 1017 "yacc.y"
+#line 1097 "yacc.y"
     { IR_MakeIOREAD((yyvsp[(2) - (2)])); }
     break;
 
   case 50:
-#line 1018 "yacc.y"
+#line 1098 "yacc.y"
     {IR_MakeIOWRITE(); }
     break;
 
   case 54:
-#line 1025 "yacc.y"
+#line 1105 "yacc.y"
     {  EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 55:
-#line 1025 "yacc.y"
+#line 1105 "yacc.y"
     { IR_MakeEXP(); }
     break;
 
   case 65:
-#line 1030 "yacc.y"
+#line 1110 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 66:
-#line 1030 "yacc.y"
+#line 1110 "yacc.y"
     { IR_MakeEXP();}
     break;
 
   case 70:
-#line 1034 "yacc.y"
+#line 1114 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 71:
-#line 1034 "yacc.y"
+#line 1114 "yacc.y"
     { IR_MakeEXP();}
     break;
 
   case 72:
-#line 1035 "yacc.y"
+#line 1115 "yacc.y"
     { EXP_PushOperator((yyvsp[(2) - (2)])); }
     break;
 
   case 73:
-#line 1035 "yacc.y"
+#line 1115 "yacc.y"
     { IR_MakeEXP();}
     break;
 
   case 80:
-#line 1044 "yacc.y"
+#line 1124 "yacc.y"
     { /* fake bottom */ }
     break;
 
   case 81:
-#line 1044 "yacc.y"
+#line 1124 "yacc.y"
     { /* fake bottom */ }
     break;
 
   case 83:
-#line 1045 "yacc.y"
+#line 1125 "yacc.y"
     { EXP_PushOperand((yyvsp[(1) - (1)]), "var"); }
     break;
 
   case 84:
-#line 1046 "yacc.y"
+#line 1126 "yacc.y"
     { EXP_PushOperand((yyvsp[(1) - (1)]), "const"); }
     break;
 
   case 85:
-#line 1047 "yacc.y"
+#line 1127 "yacc.y"
     {  IR_MakeCALL((yyvsp[(1) - (1)])); }
     break;
 
   case 86:
-#line 1049 "yacc.y"
+#line 1129 "yacc.y"
     { IR_MakeERA((yyvsp[(1) - (1)]));}
     break;
 
   case 87:
-#line 1049 "yacc.y"
+#line 1129 "yacc.y"
     { PRG_GetSymbol((yyvsp[(1) - (5)]), "global", "func"); }
     break;
 
   case 90:
-#line 1053 "yacc.y"
+#line 1133 "yacc.y"
     {IR_MakeSTACKPUSH(); }
     break;
 
   case 91:
-#line 1053 "yacc.y"
+#line 1133 "yacc.y"
     {IR_MakeSTACKPUSH(); }
     break;
 
   case 92:
-#line 1055 "yacc.y"
+#line 1135 "yacc.y"
     { IR_MakeRETURN(); }
     break;
 
 
 /* Line 1267 of yacc.c.  */
-#line 2631 "y.tab.c"
+#line 2725 "y.tab.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -2841,13 +2935,13 @@ yyreturn:
 }
 
 
-#line 1057 "yacc.y"
+#line 1137 "yacc.y"
 
 
 
 int yyerror(char * message)
 	
-{ fprintf(outputFile,"at line %d: %s\n",g_lineno,message);
+{ fprintf(stderr,"at line %d: %s\n",g_lineno,message);
   //fprintf(outputFile,"token: %d\n\n", yychar);
   return 1;
 }

@@ -1,0 +1,32 @@
+// save_cipher("aes256","passphrase")
+cipher "aes256", "passphrase";
+
+int b;
+
+func bool:orexclusivo(bool param1,bool param2):
+	bool test;
+	bool test2;
+	test = param1||param2;
+	test2 = param1!=param2;
+	return test && test2;
+endf
+
+func double:sumadobles(double param1,double param2):
+	return param1 + param2;
+endf
+
+func int:suma(int param1,int param2):
+	return param1 + param2;
+endf
+
+func int:main():
+	int resultado;
+	double resultadodobles;
+	bool resultadobool;
+	resultado = suma(300,200);
+	resultadodobles = sumadobles(300.5,200.4);
+	resultadobool = orexclusivo(true,true);
+	write resultado;
+	write resultadodobles;
+	write resultadobool;
+endf

@@ -1,0 +1,25 @@
+ERAS *era_size_main*
+CALL _main
+
+_main:
+MOVE 1 (%GLOBALS+1)
+MOVE 23 (%STACK+1)[0]
+MOVE 11 (%STACK+1)[2]
+MOVE 37 (%STACK+1)[4]
+MOVE 83 (%STACK+1)[(%GLOBALS+1)]
+MOVE numerosprimos (%STACK+12)
+LTVL 10 (%STACK+11) (%STACK+13)
+GTOF (%STACK+13) 19
+GTVL (%STACK+12) numerosprimos (%STACK+14)
+GTOF (%STACK+14) 16
+MOVE numerosprimos (%STACK+12)
+IADD 1 (%STACK+11) (%STACK+15)
+MOVE (%STACK+15) (%STACK+11)
+GOTO  11
+SPUT "Maximo numero en el arreglo:"
+IPUT (%STACK+12)
+RETV 0
+ENDF
+
+.data:
+era_size_main: 15
