@@ -1,25 +1,51 @@
 ERAS *era_size_main*
 CALL _main
 
+_orexclusivo:
+ORVL (%STACK+2) (%STACK+1) (%STACK+5)
+MOVE (%STACK+5) (%STACK+3)
+NEQL (%STACK+2) (%STACK+1) (%STACK+6)
+MOVE (%STACK+6) (%STACK+4)
+ANDV (%STACK+4) (%STACK+3) (%STACK+7)
+RETV (%STACK+7)
+ENDF
+
+_sumadobles:
+DADD (%STACK+2) (%STACK+1) (%STACK+3)
+RETV (%STACK+3)
+ENDF
+
+_suma:
+IADD (%STACK+2) (%STACK+1) (%STACK+3)
+RETV (%STACK+3)
+ENDF
+
 _main:
-MOVE 1 (%GLOBALS+1)
-MOVE 23 (%STACK+1)[0]
-MOVE 11 (%STACK+1)[2]
-MOVE 37 (%STACK+1)[4]
-MOVE 83 (%STACK+1)[(%GLOBALS+1)]
-MOVE numerosprimos (%STACK+12)
-LTVL 10 (%STACK+11) (%STACK+13)
-GTOF (%STACK+13) 19
-GTVL (%STACK+12) numerosprimos (%STACK+14)
-GTOF (%STACK+14) 16
-MOVE numerosprimos (%STACK+12)
-IADD 1 (%STACK+11) (%STACK+15)
-MOVE (%STACK+15) (%STACK+11)
-GOTO  11
-SPUT "Maximo numero en el arreglo:"
-IPUT (%STACK+12)
-RETV 0
+ERAS *era_size_suma*
+PUSH 300
+PUSH 200
+CALL _suma
+POPV (%STACK+4)
+MOVE (%STACK+4) (%STACK+1)
+ERAS *era_size_sumadobles*
+PUSH 300.5
+PUSH 200.4
+CALL _sumadobles
+POPV (%STACK+5)
+MOVE (%STACK+5) (%STACK+2)
+ERAS *era_size_orexclusivo*
+PUSH true
+PUSH true
+CALL _orexclusivo
+POPV (%STACK+6)
+MOVE (%STACK+6) (%STACK+3)
+IPUT (%STACK+1)
+DPUT (%STACK+2)
+BPUT (%STACK+3)
 ENDF
 
 .data:
-era_size_main: 15
+era_size_sumadobles: 3
+era_size_main: 6
+era_size_orexclusivo: 7
+era_size_suma: 3

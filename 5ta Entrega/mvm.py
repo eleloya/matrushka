@@ -32,11 +32,14 @@ stack = []    # For reference, Linux allow stacks up to 2 megabytes of size
 globalstack = [0 for x in range(10)] # For reference, Linux allow stacks up to 2 megabytes of size
 callstack = []
 esptmp = 0
+array_offset = 0
+marray = []
 
 #Auxiliary Functions
 
 def getValue(operand):
-    currentstack_base = sum(esp[:-1])
+    currentstack_base = sum(esp[:-1])   
+       
     if operand.startswith("("):
         index = re.search('([\d]+)',operand).group(1)
         offset = int(index) - 1
@@ -44,6 +47,21 @@ def getValue(operand):
             operand = stack[currentstack_base+offset]
         else:
             operand = globalstack[offset]
+    elif operand.startswith("["):
+        if(len(marray)>0):
+            multi_metadata = marray.pop()
+            dim = int(multi_metadata.split()[3])
+            filas = int(multi_metadata.split()[1])
+            columnas = int(multi_metadata.split()[2])
+            ary_offset = (dim*filas)+columnas
+        else:
+            ary_offset = array_offset
+        index = re.search('([\d]+)',operand).group(1)
+        offset = int(index) - 1
+        if operand.startswith("[%STACK"):
+            operand = stack[currentstack_base+offset+ary_offset]
+        else:
+            operand = globalstack[offset+ary_offset]
     
     if (str(operand)=="true"):
         operand = str(1)
@@ -53,13 +71,28 @@ def getValue(operand):
     return operand
 
 def save_in(address,value):
+    if address.startswith("["):
+        if(len(marray)>0):
+            multi_metadata = marray.pop()
+            dim = int(multi_metadata.split()[3])
+            filas = int(multi_metadata.split()[1])
+            columnas = int(multi_metadata.split()[2])
+            ary_offset = dim*filas+columnas
+            print(multi_metadata.split())
+        else:
+            ary_offset = array_offset
+    
     currentstack_base = sum(esp[:-1])
     index = re.search('([\d]+)',address).group(1)
     offset = int(index) - 1
     if address.startswith("(%STACK"):
         stack[currentstack_base+offset] = str(value)
-    else:
+    elif address.startswith("(%GLOBAL"):
         globalstack[offset] = str(value)
+    elif address.startswith("[%STACK"):
+        stack[currentstack_base+offset+ary_offset] = str(value)
+    else:
+        globalstack[offset+ary_offset] = str(value)
     
 if(debug):
     print("\nFirst pass\n-----------------------------\n")
@@ -76,7 +109,7 @@ for line in iter(firstpass):
         if(debug):
             print("A function %s at location %s" % (function_name,lineno-1))
     if line.startswith("era_size_"):
-        regs = re.search('era_size_(.*):.*(\d)',line)
+        regs = re.search('era_size_(.*):\s*(\d+)',line)
         function_name = regs.group(1)
         era_size = regs.group(2)
         function_era[function_name] = int(era_size)
@@ -108,9 +141,7 @@ while(secondpass[eip]!='.data:\n'):
         if(debug):
             print("%3s: Starting the function %s" % (eip, instruction[1:-2]))
             print("%3s: CURRENT_STACK_FRAME: %s NEXT_STACK_FRAME %s" % (eip, currentstack_base, nextstack_base))
-        # When a function starts we allocate the space needed for it
-        while(len(stack) < nextstack_base):
-            stack.append(0)
+
         eip += 1
     elif instruction.startswith("ERAS"):
         regs = re.search('era_size_(.*)', instruction)
@@ -125,6 +156,10 @@ while(secondpass[eip]!='.data:\n'):
         function_name = regs.group(1)
         jmp = function_address[function_name]
         esp.append(esptmp)
+        # When a function starts we allocate the space needed for it
+        while(len(stack) < sum(esp)):
+            stack.append(0)
+            
         if(debug):
             print("%3s: Jumping to function %s at address %s" % (eip, function_name, jmp))
         if function_name != "main":
@@ -138,26 +173,28 @@ while(secondpass[eip]!='.data:\n'):
         nextstack_base = sum(esp)
         currentstack_base = sum(esp[:-1])
         
-        #Case 1 WE GET A REFERENCE
-        if argument.startswith("("):
-            # We get the offset
-            index = re.search('([\d]+)',argument).group(1)
-            offset = int(index) - 1 
-            if argument.startswith("(%STACK"):
-                stack.append(stack[currentstack_base + offset])
-                if(debug):
-                    print("%3s: CURRENT_STACK_FRAME: %s NEXT_STACK_FRAME %s" % (eip, currentstack_base, nextstack_base))
-                    print("%3s: Pushing LOCAL VAL \"%s\" on index %s" % (eip, stack[currentstack_base + offset],str(currentstack_base + offset)))
-            else:
-                stack.append(globalstack[offset])
-                if(debug):
-                    print("%3s: Pushing GLOABL VAL \"%s\"" % (eip, globalstack[offset]))
-        #Case 2 WE GET A VALUE    
-        else:
-            stack.append(argument)
+        argument = getValue(argument)
+        stack.append(argument)
     
         if(debug):
             print("%3s: Pushing %s" % (eip, argument))
+        eip = eip + 1
+    elif instruction.startswith("AVER"):
+        regs =re.findall(r'(\S+)', instruction)
+        operand = regs[1]
+        
+        if(debug):
+            print("%3s: %s"  % (eip, instruction.strip()))
+        
+        array_offset = getValue(operand)
+        array_offset = int(array_offset)
+        if(debug):
+            print("%3s: AVER %s"  % (eip, array_offset))
+        eip = eip + 1
+    elif instruction.startswith("MVER"):
+        marray.append(instruction.strip())
+        if(debug):
+            print("%3s: %s"  % (eip, instruction.strip()))
         eip = eip + 1
     elif instruction.startswith("SADD"):
         # ISUB OPERANDA OPERANDB
@@ -479,33 +516,18 @@ while(secondpass[eip]!='.data:\n'):
         eip = eip + 1
     elif instruction.startswith("MOVE"):
         # Move es la operacion de asignacion
-        # Tiene dos operandos. A y B. B = A
+        # Tiene dos operandos. A y B. 
+        # B = A
         # B puede ser referencia local o global
         # A puede ser constante, referencia local o global
         
         regs =re.findall(r'(\S+)', instruction)
         operandA = regs[1]
         operandB = regs[2]
-        currentstack_base = sum(esp[:-1])
         
-        #La asignacion es por valor, entonces sacamos el valor de A
-        #Case 1.a WE GET A REFERENCE on A
-        if operandA.startswith("("):
-            index = re.search('([\d]+)',operandA).group(1)
-            offset = int(index) - 1
-            if operandA.startswith("(%STACK"):
-                operandA = stack[currentstack_base+offset]
-            else:
-                operandA = globalstack[offset]
-        # Caso 2. Si no es por referencia lo dejamos como viene
+        operandA = getValue(operandA)
         
-        # B es siempre una referencia local o global
-        index = re.search('([\d]+)',operandB).group(1)
-        offset = int(index) - 1
-        if operandB.startswith("(%STACK"):
-            stack[currentstack_base+offset] = operandA
-        else:
-            globalstack[offset] = operandA
+        save_in(operandB, operandA)
             
         if(debug):
             print("%3s: MOVE %s %s" % (eip, operandA, operandB))
@@ -515,8 +537,8 @@ while(secondpass[eip]!='.data:\n'):
         #B<A
         
         regs =re.findall(r'(\S+)', instruction)
-        operandA = regs[1]
-        operandB = regs[2]
+        operandA = str(regs[1])
+        operandB = str(regs[2])
         result = regs[3]
         
         operandA = getValue(operandA)
@@ -593,6 +615,56 @@ while(secondpass[eip]!='.data:\n'):
         
         #unconditional jump bro
         eip = jmp       
+    elif instruction.startswith("IGET"):
+        if(debug):
+            print("%3s: %s" % (eip, instruction.strip()))
+        
+        regs = re.search('IGET (.*)', instruction)
+        
+        operandA = regs.group(1)
+        s = input('--> ')
+        s = int(s)
+
+        save_in(operandA,s)
+        eip = eip + 1;
+    elif instruction.startswith("DGET"):
+        if(debug):
+            print("%3s: %s" % (eip, instruction.strip()))
+        
+        regs = re.search('DGET (.*)', instruction)
+        
+        operandA = regs.group(1)
+        s = input('--> ')
+        s = float(s)
+
+        save_in(operandA,s)
+        eip = eip + 1;
+    elif instruction.startswith("SGET"):
+        if(debug):
+            print("%3s: %s" % (eip, instruction.strip()))
+        
+        regs = re.search('SGET (.*)', instruction)
+        
+        operandA = regs.group(1)
+        s = input('--> ')
+        s = str(s)
+
+        save_in(operandA,s)
+        eip = eip + 1;
+    elif instruction.startswith("BGET"):
+        if(debug):
+            print("%3s: %s" % (eip, instruction.strip()))
+        
+        regs = re.search('BGET (.*)', instruction)
+        
+        operandA = regs.group(1)
+        s = input('--> ')
+        if (str(s)=="true"):
+            s = str(1)
+        elif (str(s)=="false"):
+            s = str(0)
+        save_in(operandA,s)
+        eip = eip + 1;
     elif instruction.startswith("IPUT"):
         # IPUT operandA
         # A can be either a constant or a reference

@@ -17,6 +17,7 @@
 static stack typeStack;
 static stack operandStack;
 static stack operatorStack;
+static stack dimensionStack;
 static int_stack jumpStack;
 static struct symbol SymbolTable[SYMBOL_TABLE_SIZE];
 static char* scope;
@@ -392,6 +393,7 @@ void PRG_Initialize(){
 	stackInit(&operandStack);
 	stackInit(&typeStack);
 	stackInit(&operatorStack);
+	stackInit(&dimensionStack);
 	int_stackInit(&jumpStack);
 	init_hash_table(SymbolTable);
 	
@@ -457,7 +459,8 @@ void pushOperand(char *operand, char *kind){
 
 	int response_global = member(SymbolTable, operand, "global");
 	int response_local = member(SymbolTable, operand, PRG_GetScope());
-	
+	int response_ary_global = member(SymbolTable, concat(operand,"_0"), PRG_GetScope());
+	int response_ary_local = member(SymbolTable, concat(operand,"_0"), PRG_GetScope());
 	if(response_local){
 			offset = memberNumber(SymbolTable, operand, PRG_GetScope());	
 			sprintf(offset_string, "%d", offset);
@@ -466,6 +469,14 @@ void pushOperand(char *operand, char *kind){
 		offset = memberNumber(SymbolTable, operand, "global");	
 		sprintf(offset_string, "%d", offset);
 		operand = concat("(",concat("\%GLOBALS",concat("+",concat(offset_string,")"))));
+	}else if(response_ary_local){
+		offset = memberNumber(SymbolTable, concat(operand,"_0"), PRG_GetScope());	
+		sprintf(offset_string, "%d", offset);
+		operand = concat("[",concat("\%STACK",concat("+",concat(offset_string,"]"))));
+	}else if(response_ary_global){
+		offset = memberNumber(SymbolTable, concat(operand,"_0"), "global");	
+		sprintf(offset_string, "%d", offset);
+		operand = concat("[",concat("\%GLOBALS",concat("+",concat(offset_string,"]"))));
 	}
 	
 	stackPush(&operandStack, operand);	
@@ -509,22 +520,6 @@ void IR_AddGotoF(char *operand){
 	char *instruction = concat("GTOF ", operand);
 	IRCode[program_counter] = instruction;
 	int_stackPush(&jumpStack, program_counter);
-	program_counter++;
-}
-
-void IR_AddEXP(char *operator, char *operandA, char *operandB, char *resultado){
-	if(VERBOSE)
-		printf("LINE: %-4d IR_AddEXP(%s,%s,%s,%s)\n", g_lineno, operator,operandA,operandB, resultado);
-	
-	// IADD OPA OPB T1
-	char * instruction = concat(operator, " ");
-	instruction = concat(instruction, operandA);
-	instruction = concat(instruction, " ");
-	instruction = concat(instruction, operandB);
-	instruction = concat(instruction, " ");
-	instruction = concat(instruction, resultado);
-	
-	IRCode[program_counter] = instruction;
 	program_counter++;
 }
 
@@ -677,20 +672,13 @@ void IR_MakeARGYASSIGN(char *identifier){
 	if(response_local){
 		offset = memberNumber(SymbolTable, concat(identifier,"_0"), PRG_GetScope());	
 		sprintf(offset_string, "%d", offset);
-		identifier = concat("(",concat("\%STACK",concat("+",concat(offset_string,")"))));
+		identifier = concat("[",concat("\%STACK",concat("+",concat(offset_string,"]"))));
 	}else if(response_global){
 		offset = memberNumber(SymbolTable, concat(identifier,"_0"), "global");	
 		sprintf(offset_string, "%d", offset);
-		identifier = concat("(",concat("\%GLOBALS",concat("+",concat(offset_string,")"))));
+		identifier = concat("[",concat("\%GLOBALS",concat("+",concat(offset_string,"]"))));
 	}
 	
-	//Now for the index
-	index_expression = stackPop(&operandStack);
-	stackPop(&typeStack);; // Don't do anything with it, just take it out
-	
-	// "= " + expression + " " + identifier
-	// = (%STACK+3) (%STACK+3[index])
-	identifier = concat(identifier,concat("[", concat(index_expression,"]")));
 	char * instruction = concat("MOVE ", expression);
 	instruction = concat(instruction, " ");
 	instruction = concat(instruction, identifier);
@@ -698,6 +686,7 @@ void IR_MakeARGYASSIGN(char *identifier){
 	IRCode[program_counter] = instruction;
 	program_counter++;
 }
+
 void IR_MakeASSIGN(char *identifier){
 	char *identifier_type;
 	char *expression_type;
@@ -729,6 +718,8 @@ void IR_MakeASSIGN(char *identifier){
 
 	int response_global = member(SymbolTable, identifier, "global");
 	int response_local = member(SymbolTable, identifier, PRG_GetScope());
+	int response_ary_global = member(SymbolTable, concat(identifier,"_0"), "global");
+	int response_ary_local = member(SymbolTable, concat(identifier,"_0"), PRG_GetScope());
 	
 	if(response_local){
 		offset = memberNumber(SymbolTable, identifier, PRG_GetScope());	
@@ -738,6 +729,14 @@ void IR_MakeASSIGN(char *identifier){
 		offset = memberNumber(SymbolTable, identifier, "global");	
 		sprintf(offset_string, "%d", offset);
 		identifier = concat("(",concat("\%GLOBALS",concat("+",concat(offset_string,")"))));
+	}else if(response_ary_local){
+		offset = memberNumber(SymbolTable, concat(identifier,"_0"), PRG_GetScope());	
+		sprintf(offset_string, "%d", offset);
+		identifier = concat("[",concat("\%STACK",concat("+",concat(offset_string,"]"))));
+	}else if(response_ary_global){
+		offset = memberNumber(SymbolTable, concat(identifier,"_0"), "global");	
+		sprintf(offset_string, "%d", offset);
+		identifier = concat("[",concat("\%GLOBALS",concat("+",concat(offset_string,"]"))));
 	}
 
 	//Code generation
@@ -937,10 +936,60 @@ void IR_MakeCALL(char *identifier){
 	program_counter++;
 }
 
+void IR_MakeVER(){
+	// Hubo una llamada a[exp]
+	char *operand = stackPop(&operandStack);
+	stackPop(&typeStack);
+	char *instruction;
+	
+	instruction = concat("AVER ", operand);
+	IRCode[program_counter] = instruction;
+	program_counter++;
+}
+
+void IR_MakeVERA(){
+	// Hubo una llamada a[exp]
+	char *operand = stackPop(&operandStack);
+	stackPop(&typeStack);
+	char *instruction;
+	
+	instruction = concat("VERA ", operand);
+	IRCode[program_counter] = instruction;
+	program_counter++;
+}
+
+void IR_MakeVERB(){
+	// Hubo una llamada a[exp]
+	char *operand = stackPop(&operandStack);
+	stackPop(&typeStack);
+	char *instruction;
+	
+	instruction = concat("VERB ", operand);
+	IRCode[program_counter] = instruction;
+	program_counter++;
+}
+
+void IR_MakeMULTIVER(char *identifier){
+	// Hubo una llamada a[exp][exp]
+	char *operandB = stackPop(&operandStack);
+	stackPop(&typeStack);
+	
+	char *instruction;
+
+	char *operandA = stackPop(&operandStack);
+	stackPop(&typeStack);
+	
+	char *firstDimension = memberType(SymbolTable, identifier, "_dim");
+	
+	instruction = concat("MVER ", concat(operandA, concat(" ", concat(operandB, concat(" ", firstDimension)))));
+	IRCode[program_counter] = instruction;
+	program_counter++;
+}
+
 void IR_MakeEXP(){
 	char *operator = stackPop(&operatorStack);
 	char *operand1_type = stackPop(&typeStack);
-  	char *operand2_type = stackPop(&typeStack);
+  char *operand2_type = stackPop(&typeStack);
 	char *operand1 = stackPop(&operandStack);
 	char *operand2 = stackPop(&operandStack);
 	char *temporal_variable;
@@ -962,6 +1011,8 @@ void IR_MakeEXP(){
 		operator = stackPop(&operatorStack);		
 	}
 	
+	
+	
 	//push pila_de_operandos(resultado)
 	//pop pila-de-operadores
 	
@@ -976,8 +1027,22 @@ void IR_MakeEXP(){
 	EXP_PushOperand(temporal_variable, PRG_GetScope());
 	temporal_variable = stackPop(&operandStack);
 	stackPush(&operandStack,temporal_variable);
-	//Code generation subroutine;
-	IR_AddEXP(operator,operand1,operand2,temporal_variable);
+	
+	//Code generation subroutine;	
+	if(VERBOSE)
+		printf("LINE: %-4d IR_AddEXP(%s,%s,%s,%s)\n", g_lineno, operator,operand1,operand2, temporal_variable);
+	
+	// IADD OPA OPB T1
+	char * instruction = concat(operator, " ");
+	instruction = concat(instruction, operand1);
+	instruction = concat(instruction, " ");
+	instruction = concat(instruction, operand2);
+	instruction = concat(instruction, " ");
+	instruction = concat(instruction, temporal_variable);
+	
+	IRCode[program_counter] = instruction;
+	program_counter++;
+	
 }
 
 void save_ary_symbol(char *type, char *identifier, char *range){
@@ -991,6 +1056,32 @@ void save_ary_symbol(char *type, char *identifier, char *range){
 		PRG_SaveSymbol(type, array_identifier, PRG_GetScope(), "var");
 		free(array_identifier);
 	}
+}
+
+void save_multiary_symbol(char *type, char *identifier, char *first_dimension, char *second_dimension){
+	char identifier_index[MAX_TMP_VARIABLES+1];
+	char *array_identifier;
+	int first_dimension_range;
+	int second_dimension_range;
+	int index = 0;
+	first_dimension_range = atoi(first_dimension);
+	second_dimension_range = atoi(second_dimension);
+	
+	
+	
+	for(int i=0;i<first_dimension_range;i++){
+		for(int j=0;j<second_dimension_range;j++){
+			sprintf(identifier_index, "_%d", index);
+			array_identifier = concat(identifier,identifier_index);
+			PRG_SaveSymbol(type, array_identifier, PRG_GetScope(), "var");
+			free(array_identifier);
+			index++;
+		}
+	}
+	
+	//Ugly hack
+	//Guardamos la primera dimension como Type y la secondDimesion como Kind
+	PRG_SaveSymbol(first_dimension, identifier, "_dim", second_dimension); 
 }
 %}
 
@@ -1072,6 +1163,7 @@ vardeclarations : vardeclarations vardeclaration SEMICOLONTKN;
 
 vardeclaration  : type IDTKN { PRG_SaveSymbol($1, $2, PRG_GetScope(), "var"); }
 								| type IDTKN LEFTBTKN INTVALTKN RIGHTBTKN { save_ary_symbol($1,$2,$4); }; 
+								| type IDTKN LEFTBTKN INTVALTKN RIGHTBTKN LEFTBTKN INTVALTKN RIGHTBTKN { save_multiary_symbol($1,$2,$4,$7); }; 
 
 type   			: INTTKN | DOUBLETKN | STRINGTKN | BOOLTKN;
 
@@ -1092,13 +1184,16 @@ iterstmt		: WHILETKN a_savejump LEFTPTKN expstmt { IR_MakeWHILE(); } RIGHTPTKN O
 a_savejump		: { int_stackPush(&jumpStack, program_counter); }
 
 assignstmt      : IDTKN ASSIGNTKN expstmt { IR_MakeASSIGN($1); }
-								| IDTKN LEFTBTKN expstmt RIGHTBTKN ASSIGNTKN expstmt { IR_MakeARGYASSIGN($1); }; //NOT YET
-									
+								| IDTKN LEFTBTKN expstmt  RIGHTBTKN a_range ASSIGNTKN expstmt { IR_MakeARGYASSIGN($1); }; //NOT YET
+								| IDTKN LEFTBTKN expstmt  RIGHTBTKN LEFTBTKN expstmt {IR_MakeMULTIVER($1);}  RIGHTBTKN ASSIGNTKN expstmt { IR_MakeARGYASSIGN($1); }
+a_range					: {IR_MakeVER();} 
+
 iostmt          : READTKN var  { IR_MakeIOREAD($2); }
 				| WRITETKN expstmt {IR_MakeIOWRITE(); };
 									
 var     : identifier 
-				| identifier LEFTBTKN expstmt RIGHTBTKN;
+				| identifier LEFTBTKN expstmt RIGHTBTKN { IR_MakeVER(); };
+				| identifier LEFTBTKN expstmt RIGHTBTKN  LEFTBTKN expstmt {IR_MakeMULTIVER($1);}  RIGHTBTKN;
 
 identifier		: IDTKN;
 			

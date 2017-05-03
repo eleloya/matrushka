@@ -14,7 +14,7 @@ func int:fibonacci(int n):
 		return 1;
 	endi
 
-	return fibonacci(num-1) + fibonacci(num-1);
+	return fibonacci(num-1) + fibonacci(num-2);
 endf
 
 func int:main():
@@ -22,15 +22,12 @@ func int:main():
 	int c;
 	int f;
  
-  read n;
  	c = 1;
 	global = 4;
 	
-  write "Fibonacci series\n";
- 
-  while(c<=n):
-		n = n - 1;
-	endw
+  write "Fibonacci series";
+  read n;
+	write fibonacci(n);
 		
  return 0;
 endf

@@ -17,20 +17,8 @@ endf
 func int:main():
 
 	int resultado;
-	
-	//resultado = fact(3+2);
-	
+		
 	resultado = fact(5);
-	
-	read count;
-	
-	while(resultado>1):
-		write "global value:";
-		write count;
-		write "\n factorial vaue:";
-		write resultado;
-		resultado = resultado -1;
-	endw
-	
+	write resultado;
 	return 0;
 endf
