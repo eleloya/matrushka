@@ -1,27 +1,15 @@
 // save_cipher("aes256","passphrase")
 cipher "aes256", "passphrase";
 
-int count;
-bool test;
-//Auxiliary Functions
+int a;
 
-func int:void():
-	write "jeje";
+func int:suma(int param1,int param2):
+	a = param1 + param2;
+	return a;
 endf
 
 func int:main():
-
-	int arithi;
-	double arithd;
-	string ariths;
-	
-	ariths = "loyisima";
-	arithd = 1.5+1.5+arithi;
-
-	if(ariths=="loyisima"):
-		write arithi;
-		write arithd;
-		write ariths=="loyisima";
-	endi
-	return arithi;
+		write "Tarjeta debito";
+		write "el pin es: ";
+		write suma(4244, 2);
 endf

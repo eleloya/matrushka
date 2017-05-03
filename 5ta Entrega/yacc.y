@@ -53,6 +53,23 @@ char *getTypeFromSymbol(char *symbol, char *scope){
 	return memberType(SymbolTable, symbol, scope);
 }
 
+void DBG_PrintSymbolTable(struct symbol hashtable[]){
+	printf("\nSYMBOL TABLE\n");
+	printf("%15s  %10s  ------   -----  -------  ----\n","----------","----------");
+	printf("%15s  %-10s  type     kind   address  num\n","identifier", "context");
+	printf("%15s  %10s  ------   -----  -------  ----\n","----------","----------");
+	
+  for (int i=0; i< SYMBOL_TABLE_SIZE ; i++){
+      if (NULL != hashtable[i].value)
+				printf("%15s  %10s  %7s  %5s  %7d  %d\n", hashtable[i].value, hashtable[i].contextName, hashtable[i].typeName, hashtable[i].symbolKind, hashtable[i].memoryLocation, hashtable[i].number);
+  }
+}
+
+void DBG_PrintIRCode(){
+	printf("\nIR CODE\n");
+	for(int i=0;i<program_counter;i++)
+		printf("%5d: %s\n",i, IRCode[i]);
+}
 
 /****************************************************************************/
 /**                                                                        **/
@@ -236,13 +253,12 @@ void PRG_SetScope(char *scopeName){
 * Important before checking to wich scope should we save the symbol to.
 *
 */
-char * PRG_GetScope(){	
+char * PRG_GetScope(){
 	if(VERBOSE)
 		printf("LINE: %-4d PGR_GetScope() -> %s\n", g_lineno, scope);
 	
 	return scope;
 }
-
 
 int PRG_GetFunctionVariablesNum(char *identifier){
 	//Gotta search for all the identifiers wich context is that of "identifier"
@@ -260,22 +276,58 @@ int PRG_GetFunctionVariablesNum(char *identifier){
 	return era_size;
 }
 
-/*
-* Used in the grammar rules (expcmp,exp,term,factor) for semantic analysis.
-*
-*/
-void EXP_PushOperator(char *op){
-	//Always checking
-	if (NULL==op){
-		printf("LINE: %-4d  CALL: EXP_PushOperator(NULL)\t", g_lineno);
-		printf("FATAL: Null reference.\n");
-		exit(EXIT_FAILURE);
+void PRG_ERAUpdate(){
+	/* Esta rutina es para hacer anotaciones al final del IR_CODE
+	   que el VM debe de leer */
+	
+	char *function_name;
+	int function_era_size;
+	char function_era_size_string[MAX_TMP_VARIABLES];
+	
+	IRCode[program_counter] = strdup(".data:");
+	program_counter++;
+	
+	for(int i=0;i<SYMBOL_TABLE_SIZE;i++){
+		if(NULL != SymbolTable[i].value){
+			if(strcmp(SymbolTable[i].symbolKind,"func")==0){
+				function_name = SymbolTable[i].value;
+				function_era_size = PRG_GetFunctionVariablesNum(function_name);
+				sprintf(function_era_size_string, "%d", function_era_size);
+				
+				IRCode[program_counter] = concat("era_size_",concat(function_name,concat(": ", function_era_size_string)));
+				program_counter++;
+			}
+		}
 	}
 	
-	stackPush(&operatorStack,op);
 	
-	if(VERBOSE)
-		printf("LINE: %-4d EXP_PushOperator(%s)\n", g_lineno, op);	
+	
+	//Esta rutina es para hacerlo inline en el IR_CODE
+	/*
+	char *function_name;
+	int function_era_size;
+	char *function_era_size_string;
+	char *era_string;
+	
+	for(int i=0;i<SYMBOL_TABLE_SIZE;i++){
+		if(NULL != SymbolTable[i].value){
+			if(strcmp(SymbolTable[i].symbolKind,"func")==0){
+				function_name = SymbolTable[i].value;
+				function_era_size = PRG_GetFunctionVariablesNum(function_name);
+				era_string = concat("*era_size_",concat(function_name,"*"));
+				printf("%s: %d\n", function_name, function_era_size);
+				//Now scan the IR For ocurrences of *era_size_FUNCNAME*
+				//replace it with function_era_size
+				for(int j=0;j<program_counter;j++){
+					if(strstr(era_string,IRCode[j])){
+						printf("On line %d there is a era_size reference for %s \n", j, era_string);
+					}
+				}
+			}
+		}
+	}	
+
+	*/
 }
 
 void PRG_SaveSymbol(char *typeName, char *identifierName, char *scopeName, char *symbolKind){
@@ -324,6 +376,113 @@ void PRG_GetSymbol(char *identifierName, char *scopeName, char *symbolKind){
 	
 	
 	//printf("Checking for '%s' symbol existance on scope %s of type %s\n", identifierName, scopeName, symbolKind);
+}
+
+void PRG_Initialize(){
+	PRG_SetScope("global");
+	
+	stackInit(&operandStack);
+	stackInit(&typeStack);
+	stackInit(&operatorStack);
+	int_stackInit(&jumpStack);
+	init_hash_table(SymbolTable);
+	
+	for(int i=0;i<MAX_PROGRAM_SIZE;i++)
+		IRCode[i] = NULL;
+	
+	char *instruction;
+	instruction = strdup("ERAS *era_size_main*");
+	IRCode[program_counter] = instruction;
+	program_counter++;
+	
+	instruction = strdup("CALL _main");
+	IRCode[program_counter] = instruction;
+	program_counter++;
+	
+	instruction = strdup("");
+	IRCode[program_counter] = instruction;
+	program_counter++;
+}
+
+/*
+* Used in the grammar rules (expcmp,exp,term,factor) for semantic analysis.
+*
+*/
+
+//TO-DO Meter estos dos a EXP_PushOperand
+void pushType(char *value, char *symbolKind){
+	char *factorType;
+	
+	if(strcmp(symbolKind,"const")==0){ // then is a constant
+		factorType = getTypeFromValue(value);
+		//printf("Retrived type for %s is %s\n\n", value, factorType);
+	}else{ // then is a variable or a function
+		factorType = memberType(SymbolTable, value, PRG_GetScope());
+		//printf("Retrived type for %s is %s in scope: %s\n\n", value, factorType, PRG_GetScope());
+	}
+		
+	// We must transform the type into a int because these stack only holds integers
+	stackPush(&typeStack,factorType);
+}
+
+void pushOperand(char *operand, char *kind){
+	int offset;
+	char offset_string[MAX_PROGRAM_SIZE];
+	//A lo mejor deberia checar que sea permitido. Pero no pasarian por flex ni bison...
+	if(strcmp(kind,"func")==0){
+		stackPush(&operandStack, operand);
+	}else if(strcmp(kind,"const")==0){
+		stackPush(&operandStack, operand);
+	}else{
+	//Else means that it is not a function, it is not a constnat.
+	//So it means it must be within reach of the stack.
+	//We can calculate that if we know the index of the variable in the stack
+	offset = memberNumber(SymbolTable, operand, PRG_GetScope());
+	sprintf(offset_string, "%d", offset);
+
+	int response_global = member(SymbolTable, operand, "global");
+	
+	if(response_global){
+		offset = memberNumber(SymbolTable, operand, "global");	
+		sprintf(offset_string, "%d", offset);
+		operand = concat("(",concat("\%GLOBALS",concat("+",concat(offset_string,")"))));
+	}else{
+		offset = memberNumber(SymbolTable, operand, PRG_GetScope());	
+		sprintf(offset_string, "%d", offset);
+		operand = concat("(",concat("\%STACK",concat("+",concat(offset_string,")"))));
+	}
+	
+	stackPush(&operandStack, operand);	
+	}
+}
+
+void EXP_PushOperand(char *operand, char *symbolKind){
+	//TO-DO Check for NULLS
+	
+	//Check for the existance of a variable before even continuing.
+	if(strcmp(symbolKind,"var")==0)
+		PRG_GetSymbol(operand, PRG_GetScope(), "var"); 
+	
+	//Later is the same for both expressions
+	pushType(operand, symbolKind); 
+	pushOperand(operand, symbolKind);
+	
+	if(VERBOSE)
+		printf("LINE: %-4d EXP_PushOperand(%s,%s)\n", g_lineno, operand,symbolKind);
+}
+
+void EXP_PushOperator(char *op){
+	//Always checking
+	if (NULL==op){
+		printf("LINE: %-4d  CALL: EXP_PushOperator(NULL)\t", g_lineno);
+		printf("FATAL: Null reference.\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	stackPush(&operatorStack,op);
+	
+	if(VERBOSE)
+		printf("LINE: %-4d EXP_PushOperator(%s)\n", g_lineno, op);	
 }
 
 void IR_AddGotoF(char *operand){
@@ -663,6 +822,7 @@ void IR_MakeERA(char *identifier){
 	//This brings up a problem. Cant have variabels having the prefix erasize_
 	char *era_size_string = concat("era_size_", identifier);
 	char *instruction = concat("ERAS *", era_size_string);
+	instruction = concat(instruction,"*");
 	IRCode[program_counter] = instruction;
 	program_counter++;
 }
@@ -683,67 +843,6 @@ void IR_MakeSTACKPUSH(){
 	instruction = concat("PUSH ", expression);
 	IRCode[program_counter] = instruction;
 	program_counter++;
-}
-
-void pushType(char *value, char *symbolKind){
-	char *factorType;
-	
-	if(strcmp(symbolKind,"const")==0){ // then is a constant
-		factorType = getTypeFromValue(value);
-		//printf("Retrived type for %s is %s\n\n", value, factorType);
-	}else{ // then is a variable or a function
-		factorType = memberType(SymbolTable, value, PRG_GetScope());
-		//printf("Retrived type for %s is %s in scope: %s\n\n", value, factorType, PRG_GetScope());
-	}
-		
-	// We must transform the type into a int because these stack only holds integers
-	stackPush(&typeStack,factorType);
-}
-
-void pushOperand(char *operand, char *kind){
-	int offset;
-	char offset_string[MAX_PROGRAM_SIZE];
-	//A lo mejor deberia checar que sea permitido. Pero no pasarian por flex ni bison...
-	if(strcmp(kind,"func")==0){
-		stackPush(&operandStack, operand);
-	}else if(strcmp(kind,"const")==0){
-		stackPush(&operandStack, operand);
-	}else{
-	//Else means that it is not a function, it is not a constnat.
-	//So it means it must be within reach of the stack.
-	//We can calculate that if we know the index of the variable in the stack
-	offset = memberNumber(SymbolTable, operand, PRG_GetScope());
-	sprintf(offset_string, "%d", offset);
-
-	int response_global = member(SymbolTable, operand, "global");
-	
-	if(response_global){
-		offset = memberNumber(SymbolTable, operand, "global");	
-		sprintf(offset_string, "%d", offset);
-		operand = concat("(",concat("\%GLOBALS",concat("+",concat(offset_string,")"))));
-	}else{
-		offset = memberNumber(SymbolTable, operand, PRG_GetScope());	
-		sprintf(offset_string, "%d", offset);
-		operand = concat("(",concat("\%STACK",concat("+",concat(offset_string,")"))));
-	}
-	
-	stackPush(&operandStack, operand);	
-	}
-}
-
-void EXP_PushOperand(char *operand, char *symbolKind){
-	//TO-DO Check for NULLS
-	
-	//Check for the existance of a variable before even continuing.
-	if(strcmp(symbolKind,"var")==0)
-		PRG_GetSymbol(operand, PRG_GetScope(), "var"); 
-	
-	//Later is the same for both expressions
-	pushType(operand, symbolKind); 
-	pushOperand(operand, symbolKind);
-	
-	if(VERBOSE)
-		printf("LINE: %-4d EXP_PushOperand(%s,%s)\n", g_lineno, operand,symbolKind);
 }
 
 void IR_MakeCALL(char *identifier){ 
@@ -813,50 +912,6 @@ void IR_MakeEXP(){
 	IR_AddEXP(operator,operand1,operand2,temporal_variable);
 }
 
-void PRG_Initialize(){
-	PRG_SetScope("global");
-	
-	stackInit(&operandStack);
-	stackInit(&typeStack);
-	stackInit(&operatorStack);
-	int_stackInit(&jumpStack);
-	init_hash_table(SymbolTable);
-	
-	for(int i=0;i<MAX_PROGRAM_SIZE;i++)
-		IRCode[i] = NULL;
-	
-	char *instruction;
-	instruction = strdup("ERAS *era_size_main");
-	IRCode[program_counter] = instruction;
-	program_counter++;
-	
-	instruction = strdup("CALL _main");
-	IRCode[program_counter] = instruction;
-	program_counter++;
-	
-	instruction = strdup("");
-	IRCode[program_counter] = instruction;
-	program_counter++;
-}
-
-void DBG_PrintSymbolTable(struct symbol hashtable[]){
-	printf("\nSYMBOL TABLE\n");
-	printf("%15s  %10s  ------   -----  -------  ----\n","----------","----------");
-	printf("%15s  %-10s  type     kind   address  num\n","identifier", "context");
-	printf("%15s  %10s  ------   -----  -------  ----\n","----------","----------");
-	
-  for (int i=0; i< SYMBOL_TABLE_SIZE ; i++){
-      if (NULL != hashtable[i].value)
-				printf("%15s  %10s  %7s  %5s  %7d  %d\n", hashtable[i].value, hashtable[i].contextName, hashtable[i].typeName, hashtable[i].symbolKind, hashtable[i].memoryLocation, hashtable[i].number);
-  }
-}
-
-void DBG_PrintIRCode(){
-	printf("\nIR CODE\n");
-	for(int i=0;i<program_counter;i++)
-		printf("%5d: %s\n",i, IRCode[i]);
-}
-
 %}
 
 //Reserved Words
@@ -906,8 +961,9 @@ Atributos para llamadas de funciones:
 	//TO-DO pasar las dos funciones de al final para el final de main.c
 	//que pedo con los programas sin secerto.. checar si se awita el shift reduce
 	//remplazar esa funcion de al final con una seccion de los tamaños del ERA:
-program   		: secrets { PRG_Initialize(); } vardeclarations functions { DBG_PrintSymbolTable(SymbolTable); DBG_PrintIRCode(); }
-				| secrets { PRG_Initialize(); } functions 
+program   		: secrets { PRG_Initialize(); } vardeclarations functions eraupdate { DBG_PrintSymbolTable(SymbolTable); DBG_PrintIRCode(); }
+				| secrets { PRG_Initialize(); } functions eraupdate
+eraupdate       : { PRG_ERAUpdate(); }
 										
 
 secrets			: secrets secret
