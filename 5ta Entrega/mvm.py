@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import re
+import subprocess
 
 def header():
     print("MATRUSHKA VIRTUAL MACHINE\n")
@@ -96,9 +97,36 @@ def save_in(address,value):
     
 if(debug):
     print("\nFirst pass\n-----------------------------\n")
-    
+
+#First decrypt in case it is encrypted 
+ceropass = open(ircode,'r').readlines()
+while("ASKP" in ceropass[0]):
+    regs =re.findall(r'(\S+)', ceropass[0])
+    cipher = regs[1]
+    print("This software is encrypted with %s" % cipher)
+    if(cipher=="DES"):
+        cipher = "-des-cbc"
+    elif(cipher=="AES"):
+        cipher = "-aes-256-cbc"
+    elif(cipher=="BLOWFISH"):
+        cipher = "-bf-cbc"
+    else:
+        sys.exit();
+
+    password = input('Enter the passphrase: ')
+    proc = subprocess.Popen(["openssl","enc","-a",cipher,"-d","-k",password], stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+    ciphertext = "\n".join(ceropass[1:])    
+    try:
+        proc.stdin.write(str.encode(ciphertext))
+        proc.stdin.close()
+        result = proc.stdout.read()
+        ceropass = result.decode().splitlines(1)
+    except:
+        print("Couldn't decrypt software")
+        sys.exit()  
+  
 # In the first pass we build the function_adress and function_era structures
-firstpass = open(ircode,'r')
+firstpass = ceropass
 for line in iter(firstpass):
     lineno = lineno + 1
     if line.startswith(".data"):
@@ -115,15 +143,15 @@ for line in iter(firstpass):
         function_era[function_name] = int(era_size)
         if(debug):
             print("A function %s with %s variables" % (function_name,era_size))
-firstpass.close()
 
 if(debug):
     print("\nSecond pass\n-----------------------------\n")
 
 # In the second pass we actually execute the code
 # We keep advacing the EIP until we reach the .data section
-secondpass = open(ircode,'r').readlines()
-while(secondpass[eip]!='.data:\n'):
+secondpass = ceropass
+
+while(".data:" not in (secondpass[eip])):
     instruction = secondpass[eip]
     
     #Python no maneja SWITCH/CASE structures. Tendra que ser un good old fashion if/elseif

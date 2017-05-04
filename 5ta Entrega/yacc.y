@@ -18,6 +18,7 @@ static stack typeStack;
 static stack operandStack;
 static stack operatorStack;
 static stack dimensionStack;
+static stack cipherStack;
 static int_stack jumpStack;
 static struct symbol SymbolTable[SYMBOL_TABLE_SIZE];
 static char* scope;
@@ -414,6 +415,104 @@ void PRG_Initialize(){
 	program_counter++;
 }
 
+void PRG_PushCipher(char * cipher_algorithm, char * cipher_key){
+	char *cipher_key_clean;
+	static int cipher_first_time = TRUE;
+	
+	if(strstr(cipher_algorithm, "aes256")){
+		cipher_algorithm = "-aes-256-cbc";
+	}else if(strstr(cipher_algorithm, "blowfish")){
+		cipher_algorithm = "-bf-cbc";
+	}else if(strstr(cipher_algorithm, "des")){
+		cipher_algorithm = "-des-cbc";
+	}else{
+		//ERROR
+		printf("LINE: %-4d CALL: PRG_PushCipher(%s, %s)\n", g_lineno, cipher_algorithm, cipher_key);
+		printf("FATAL: Unknow algorithm %s. Can only do aes256, blowfish and des \n", cipher_algorithm);
+		exit(EXIT_FAILURE);
+	}
+	
+	// Las strings llegan con todo y \"comillas\"
+	// Esta subrutina las quita
+	cipher_key_clean = strdup(cipher_key);
+	cipher_key_clean = strtok(cipher_key_clean,"\"");
+
+	if(cipher_first_time){
+		stackInit(&cipherStack);
+		cipher_first_time = FALSE;
+	}
+	//We push to the cipherStack on pairs 
+	stackPush(&cipherStack, cipher_algorithm);
+	stackPush(&cipherStack, cipher_key_clean);
+}
+
+void PRG_EncryptCode(){
+	char *cipher_algorithm;
+	char *cipher_key;
+	char *command;
+	char *tmp_string[2];
+	
+	while(cipherStack.size!=0){
+		cipher_key = stackPop(&cipherStack);
+		cipher_algorithm = stackPop(&cipherStack);
+		
+		//This is other level magic 
+		tmp_string[0] = concat("openssl enc -a ", cipher_algorithm);
+		command = strdup(tmp_string[0]);
+		free(tmp_string[0]);
+		tmp_string[0] = concat(" -k ", cipher_key);
+		tmp_string[1] = concat(command, tmp_string[0]);
+		free(tmp_string[0]);
+		tmp_string[0] = concat(tmp_string[1], " -out /tmp/babushka.sec");
+		free(command);
+		free(tmp_string[1]);
+		command = strdup(tmp_string[0]);   // open ssl enc -a -aes-256-cbc -k password
+		free(tmp_string[0]);
+		
+		printf("\n%s\n", command);
+		
+		FILE *crypto_engine = popen(command, "w");
+		for(int i=0;i<program_counter;i++){
+			fprintf(crypto_engine, "%s\n", IRCode[i]);
+		}
+	  pclose(crypto_engine);
+		
+		//Now the encrypted code is in /tmp/babushka.sec
+		//We must read it back and replace IRCode
+		FILE *cryptedfile;
+		char * buffer = (char *)malloc(100 * sizeof(char));
+		size_t len = 0;
+		ssize_t linelen;
+		
+		cryptedfile = fopen("/tmp/babushka.sec","r");
+		if (cryptedfile==NULL){
+			printf("LINE: %-4d  CALL: PRG_EncryptCode()\n", g_lineno);
+			printf("FATAL: Could not open encrypted file /tmp/babushka.sec\n");
+			exit(EXIT_FAILURE);
+		}
+		
+		//Here we are going to replace IRCode with wathever it is on babushka.sec
+		program_counter = 0;
+		if(strcmp(cipher_algorithm,"-aes-256-cbc")==0)
+			IRCode[program_counter] = strdup("ASKP AES");
+		if(strcmp(cipher_algorithm,"-des-cbc")==0)
+			IRCode[program_counter] = strdup("ASKP DES");
+		if(strcmp(cipher_algorithm,"-bf-cbc")==0)
+			IRCode[program_counter] = strdup("ASKP BLOWFISH");
+		program_counter++;
+		while ((linelen = getline(&buffer,&len,cryptedfile))>0){
+			buffer[strlen(buffer) - 1] = 0;
+			IRCode[program_counter] = strdup(buffer);
+			program_counter++;
+		}
+		
+		fclose(cryptedfile);
+		free(buffer);
+		
+		//Now we delete the file /tmp/babushka.sec
+	}
+}
+
 /*
 * Used in the grammar rules (expcmp,exp,term,factor) for semantic analysis.
 *
@@ -502,7 +601,7 @@ void EXP_PushOperand(char *operand, char *symbolKind){
 void EXP_PushOperator(char *op){
 	//Always checking
 	if (NULL==op){
-		printf("LINE: %-4d  CALL: EXP_PushOperator(NULL)\t", g_lineno);
+		printf("LINE: %-4d  CALL: EXP_PushOperator(NULL)\n", g_lineno);
 		printf("FATAL: Null reference.\n");
 		exit(EXIT_FAILURE);
 	}
@@ -1132,18 +1231,17 @@ Atributos para llamadas de funciones:
 	//TO-DO pasar las dos funciones de al final para el final de main.c
 	//que pedo con los programas sin secerto.. checar si se awita el shift reduce
 	//remplazar esa funcion de al final con una seccion de los tamaños del ERA:
-program   		: secrets { PRG_Initialize(); } vardeclarations functions eraupdate { DBG_PrintSymbolTable(SymbolTable); DBG_PrintIRCode(); PRG_SaveIRCode(); }
-				| secrets { PRG_Initialize(); } functions eraupdate
-eraupdate       : { PRG_ERAUpdate(); }
-										
+program   		: secrets {  PRG_Initialize(); } vardeclarations functions eraupdate { PRG_EncryptCode(); PRG_SaveIRCode(); }
+							| secrets {  PRG_Initialize(); } functions eraupdate { PRG_EncryptCode(); PRG_SaveIRCode(); }
+eraupdate 		: { PRG_ERAUpdate(); }
 
-secrets			: secrets secret
-				| secret
+secrets				: secrets secret
+							| secret
 
-secret			: CIPHERTKN STRINGVALTKN COMMATKN STRINGVALTKN SEMICOLONTKN
+secret				: /* empty */ | CIPHERTKN STRINGVALTKN COMMATKN STRINGVALTKN { PRG_PushCipher($2,$4); } SEMICOLONTKN
 
-functions       : functions function
-				| function;
+functions			: functions function
+							| function;
 
 function		: FUNCTKN type OPENBLOCKTKN IDTKN { IR_MakeFUNCTION($4); PRG_SetScope($4); PRG_SaveSymbol($2, $4, "global", "func");  } LEFTPTKN params RIGHTPTKN OPENBLOCKTKN funcbody { IR_MakeFUNCTIONEND(); } ENDFUNCTKN;
 

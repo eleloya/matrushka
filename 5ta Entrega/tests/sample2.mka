@@ -1,5 +1,8 @@
 // save_cipher("aes256","passphrase")
-cipher "aes256", "passphrase";
+cipher "des", "gacho";
+cipher "aes256", "perro";
+cipher "blowfish", "babas";
+cipher "aes256", "perrogacho";
 
 int b;
 
