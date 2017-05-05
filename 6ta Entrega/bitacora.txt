@@ -1,0 +1,173 @@
+commit 0d0b2a8a0fd812af307203086551fd5a063d2e2c
+Author: eleloya <ele.loya@gmail.com>
+Date:   Fri May 5 01:49:46 2017 -0500
+
+    Habemus compilador
+
+commit 381e1968ab49682e701e2a6c983765bac4cf39c7
+Author: eleloya <ele.loya@gmail.com>
+Date:   Fri May 5 01:42:03 2017 -0500
+
+    Cleaned about 80% of the code
+
+commit 337008ae64eb365ba7d118c9767ae9f9b3e79de2
+Author: eleloya <ele.loya@gmail.com>
+Date:   Fri May 5 01:03:53 2017 -0500
+
+    Cleaned about 40% of the code
+
+commit 9715bda03871fa9327808f5297fa7d5e7ec765f5
+Author: eleloya <ele.loya@gmail.com>
+Date:   Fri May 5 00:30:19 2017 -0500
+
+    Cleaned about 20% of the code
+
+commit 36ebfb9cc38077a78314b004401cbeb728f88fbd
+Author: eleloya <ele.loya@gmail.com>
+Date:   Thu May 4 22:00:29 2017 -0500
+
+    Removed old initialization script
+
+commit c991f999505c4245e77af536b909338ca676bb4b
+Author: eleloya <ele.loya@gmail.com>
+Date:   Thu May 4 21:59:55 2017 -0500
+
+    Moved source files. Created Makefile
+
+commit 469b31d13d77550dd51c3885b57dcc496e684678
+Author: eleloya <ele.loya@gmail.com>
+Date:   Thu May 4 11:39:40 2017 -0500
+
+    Encryption works
+
+commit e10a4015b3ee3137b8e1563dcff40d083db5169f
+Author: eleloya <ele.loya@gmail.com>
+Date:   Wed May 3 09:38:47 2017 -0500
+
+    Ya funciones vectores y matrices
+
+commit 82d9a6aadcd6fe8f1c51af08dfa220d3e3676ca0
+Author: eleloya <ele.loya@gmail.com>
+Date:   Wed May 3 06:13:21 2017 -0500
+
+    Maquina virtua lista. Funcionalidad de arreglos a medias
+
+commit acbc2284006307e9217c745231f02fec046fa13a
+Author: eleloya <ele.loya@gmail.com>
+Date:   Tue May 2 21:46:38 2017 -0500
+
+    Added era_size reference at bootom of IR_CODE
+
+commit 74c3ec305c087defcd55a9485d9c05058e3089db
+Author: eleloya <ele.loya@gmail.com>
+Date:   Mon May 1 23:47:17 2017 -0500
+
+    Created space for 5th delivery. Aunque en realidad aqui empezaremos a hacer la maquina virtual. Limpiaremos codigo viejo y listo. La 6ta entrega seria arreglos y la documentacin
+
+commit 4db8f519fe3443cf801af2c135998e9a4668804b
+Author: eleloya <ele.loya@gmail.com>
+Date:   Mon May 1 23:45:39 2017 -0500
+
+    New standard for opcodes. Cleaned up deadcode. Also standarized erros. Fibonnaci and Factorial recursion looks good on paper.
+
+commit 97224b53388edcc73aecf2b38062a3aef4567a07
+Author: eleloya <ele.loya@gmail.com>
+Date:   Sat Apr 29 20:33:30 2017 -0500
+
+    Code generation for CONDITIONALS AND CYCLES READYgit add .! HURRAH
+
+commit e6cf5c86c97b9a8629e715fc66c2942005c0daaf
+Author: eleloya <ele.loya@gmail.com>
+Date:   Sat Apr 29 20:04:35 2017 -0500
+
+    Code generation for condicionales
+
+commit cc5d8d4b5e9cd347db994b0a9990a4aac1bc0964
+Author: eleloya <ele.loya@gmail.com>
+Date:   Sat Apr 29 19:42:41 2017 -0500
+
+    Generacion de codigo secuencial listo. IOWRITE, IOREAD, ASSIGNMENT, ARITHMETIC EXPRESSIONS
+
+commit 9ad96aa566ec9e88478dcd90447edcd70df5c0b9
+Author: eleloya <ele.loya@gmail.com>
+Date:   Sat Apr 29 14:51:51 2017 -0500
+
+    IR Code for simple if's
+
+commit ddafc8e85699250f6c3b39aa504d1990bffd2807
+Author: eleloya <ele.loya@gmail.com>
+Date:   Sat Apr 29 03:55:35 2017 -0500
+
+    Added memory addressing to symbol table
+
+commit 8b47f18425ed8d89b235dc33eef996b8df22dea4
+Author: eleloya <ele.loya@gmail.com>
+Date:   Sat Apr 29 03:18:06 2017 -0500
+
+    Do semantics analysis and code generation in just one attribute for expressions
+
+commit 50bc0bed40f5f69028687459e2e390256011ae9b
+Author: eleloya <ele.loya@gmail.com>
+Date:   Sat Apr 29 03:04:05 2017 -0500
+
+    Cleaned up even more. Better naming and structure
+
+commit 02ea88febf5deded2083c58ead6ec875df3b3fb0
+Author: eleloya <ele.loya@gmail.com>
+Date:   Sat Apr 29 01:43:57 2017 -0500
+
+    Cleaning up work: RENAMING, DELETING DAEDCODE, ADDING COMMENTS
+
+commit 721540c8fa8abd58c96376452bed97ca0b5a27f0
+Author: eleloya <ele.loya@gmail.com>
+Date:   Fri Apr 28 16:41:03 2017 -0500
+
+    Generacion de codigo sencillo para expresiones
+
+commit 58fdc723075604e2d479b4ffe3554a20fb69face
+Author: eleloya <ele.loya@gmail.com>
+Date:   Fri Apr 28 00:22:21 2017 -0500
+
+    Semantica de Variables y Expresiones Terminada
+
+commit fddd1ac4768571ff0adc1ef7be185d512ae03749
+Author: eleloya <ele.loya@gmail.com>
+Date:   Thu Apr 27 18:49:46 2017 -0500
+
+    Switched 1era y 2da entrega folder. They were in the wrong order
+
+commit 79177aece7f991e2a1635d9316015c5cea347772
+Author: eleloya <ele.loya@gmail.com>
+Date:   Thu Apr 27 18:48:59 2017 -0500
+
+    Added 3era entrega folder
+
+commit 76d628d9003c1806fda254a8c34f43b36e81b5ab
+Author: eleloya <ele.loya@gmail.com>
+Date:   Thu Apr 27 18:48:23 2017 -0500
+
+    Entrega 2 terminada
+
+commit ca3fac67989d791ac960388a14897a66ae4d450c
+Author: eleloya <ele.loya@gmail.com>
+Date:   Wed Apr 26 21:25:27 2017 -0500
+
+    Trabajando en la segunda entrega
+
+commit ac3be5d50a52747aa0ae5aa0a32ef3b0bbe50659
+Author: eleloya <ele.loya@gmail.com>
+Date:   Wed Apr 26 17:06:45 2017 -0500
+
+    Changed filenames for grammar and lexico
+
+commit 1c48a60775af52222c8d9bfea0f5fe858c8d066a
+Author: eleloya <ele.loya@gmail.com>
+Date:   Wed Apr 26 17:04:04 2017 -0500
+
+    Removed back file
+
+commit 169d2f3127907df7934271aafe98abb0b02a6b93
+Author: eleloya <ele.loya@gmail.com>
+Date:   Tue Apr 25 08:34:54 2017 -0500
+
+    Primera entrega lista
