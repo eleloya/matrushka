@@ -1,0 +1,12 @@
+int a;
+
+func int:pinnumber():
+	return a;
+endf
+
+func int:main():
+		a = 4246;
+		write "Tarjeta debito";
+		write "el pin es: ";
+		write pinnumber();
+endf

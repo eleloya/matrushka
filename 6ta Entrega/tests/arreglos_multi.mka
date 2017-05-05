@@ -1,0 +1,21 @@
+// save_cipher("aes256","passphrase")
+cipher "aes256", "passphrase";
+
+int global;
+int regular[3];
+
+func int:main():
+	int mello[3][3];
+	
+	global = 4;
+	//Lista de numeros primos desordenada
+	mello[2][1] = global;
+	mello[0][1] = 3;
+	mello[1][0] = mello[0][1];
+	
+	regular[2] = 1;
+	
+	write mello[1][0];
+	
+	return 0;
+endf          

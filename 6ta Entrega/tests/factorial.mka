@@ -1,0 +1,21 @@
+int count;
+bool test;
+//Auxiliary Functions
+
+	
+func int:fact(int x):
+		if ( x == 0 ):
+        return 1;
+		endi
+    return (x * fact(x - 1));
+endf
+
+
+func int:main():
+
+	int resultado;
+		
+	resultado = fact(100);
+	write resultado;
+	return 0;
+endf
