@@ -1229,59 +1229,56 @@ void save_multiary_symbol(char *type, char *identifier, char *first_dimension, c
 %token LEFTPTKN RIGHTPTKN SEMICOLONTKN LEFTBTKN RIGHTBTKN COMMATKN OPENBLOCKTKN
 
 %%
-	//TO-DO pasar las dos funciones de al final para el final de main.c
-	//que pedo con los programas sin secerto.. checar si se awita el shift reduce
-	//remplazar esa funcion de al final con una seccion de los tamaños del ERA:
-program   		: secrets {  PRG_Initialize(); } vardeclarations functions a_prgend
-							| secrets {  PRG_Initialize(); } functions a_prgend
-a_prgend			: { PRG_ERAUpdate(); if(VERBOSE){ DBG_PrintSymbolTable(SymbolTable); DBG_PrintIRCode(); } PRG_EncryptCode(); PRG_SaveIRCode(); }
+program   			: secrets {  PRG_Initialize(); } vardeclarations functions a_prgend
+								| secrets {  PRG_Initialize(); } functions a_prgend
+a_prgend				: { PRG_ERAUpdate(); if(VERBOSE){ DBG_PrintSymbolTable(SymbolTable); DBG_PrintIRCode(); } PRG_EncryptCode(); PRG_SaveIRCode(); }
 
-secrets				: secrets secret
-							| secret
+secrets					: secrets secret
+								| secret
 
 //Esta regla es la que ocasiona el warning the "shift/reduce" conflict. But be no afraid. Yacc lo resuelve sin problemas
-secret				: /* empty */ | CIPHERTKN STRINGVALTKN COMMATKN STRINGVALTKN { PRG_PushCipher($2,$4); } SEMICOLONTKN
+secret					: /* empty */ | CIPHERTKN STRINGVALTKN COMMATKN STRINGVALTKN { PRG_PushCipher($2,$4); } SEMICOLONTKN
 
-functions			: functions function
-							| function;
+functions				: functions function
+								| function;
 
-function		: FUNCTKN type OPENBLOCKTKN IDTKN { IR_MakeFUNCTION($4); PRG_SetScope($4); PRG_SaveSymbol($2, $4, "global", "func");  } LEFTPTKN params RIGHTPTKN OPENBLOCKTKN funcbody { IR_MakeFUNCTIONEND(); } ENDFUNCTKN;
+function				: FUNCTKN type OPENBLOCKTKN IDTKN { IR_MakeFUNCTION($4); PRG_SetScope($4); PRG_SaveSymbol($2, $4, "global", "func");  } LEFTPTKN params RIGHTPTKN OPENBLOCKTKN funcbody { IR_MakeFUNCTIONEND(); } ENDFUNCTKN;
 
-funcbody		: /* empty */ | vardeclarations blockstmts
-				| blockstmts
+funcbody				: /* empty */ | vardeclarations blockstmts
+								| blockstmts
 
-params			: /* empty */ | paramlist;
+params					: /* empty */ | paramlist;
 
-paramlist       : paramlist COMMATKN param 
-				| param;
+paramlist     	: paramlist COMMATKN param 
+								| param;
 
-param           : type IDTKN { PRG_SaveSymbol($1, $2, PRG_GetScope(), "param"); };
+param         	: type IDTKN { PRG_SaveSymbol($1, $2, PRG_GetScope(), "param"); };
 
 						
 vardeclarations : vardeclarations vardeclaration SEMICOLONTKN;
-				| vardeclaration SEMICOLONTKN;
+								| vardeclaration SEMICOLONTKN;
 
 vardeclaration  : type IDTKN { PRG_SaveSymbol($1, $2, PRG_GetScope(), "var"); }
 								| type IDTKN LEFTBTKN INTVALTKN RIGHTBTKN { save_ary_symbol($1,$2,$4); }; 
 								| type IDTKN LEFTBTKN INTVALTKN RIGHTBTKN LEFTBTKN INTVALTKN RIGHTBTKN { save_multiary_symbol($1,$2,$4,$7); }; 
 
-type   			: INTTKN | DOUBLETKN | STRINGTKN | BOOLTKN;
+type   					: INTTKN | DOUBLETKN | STRINGTKN | BOOLTKN;
 
 
 blockstmts      : blockstmts blockstmt;
-				| blockstmt;
+								| blockstmt;
 
 blockstmt       : assignstmt SEMICOLONTKN | returnstmt SEMICOLONTKN | ifstmt | iterstmt | iostmt SEMICOLONTKN | callstmt SEMICOLONTKN;
 
 ifstmt          : IFTKN LEFTPTKN expstmt a_openif RIGHTPTKN OPENBLOCKTKN blockstmts ENDIFTKN a_closeif
- 				| IFTKN LEFTPTKN expstmt a_openif RIGHTPTKN OPENBLOCKTKN blockstmts ELSETKN a_elseif blockstmts ENDIFTKN a_closeif;
+ 								| IFTKN LEFTPTKN expstmt a_openif RIGHTPTKN OPENBLOCKTKN blockstmts ELSETKN a_elseif blockstmts ENDIFTKN a_closeif;
 
-a_openif		: { IR_MakeIF(); }
-a_closeif		: { IR_MakeENDIF(); }
-a_elseif		: { IR_MakeELSEIF(); }
+a_openif				: { IR_MakeIF(); }
+a_closeif				: { IR_MakeENDIF(); }
+a_elseif				: { IR_MakeELSEIF(); }
 
-iterstmt		: WHILETKN a_savejump LEFTPTKN expstmt { IR_MakeWHILE(); } RIGHTPTKN OPENBLOCKTKN blockstmts ENDWHILETKN { IR_MakeENDWHILE(); };
-a_savejump		: { int_stackPush(&jumpStack, program_counter); }
+iterstmt				: WHILETKN a_savejump LEFTPTKN expstmt { IR_MakeWHILE(); } RIGHTPTKN OPENBLOCKTKN blockstmts ENDWHILETKN { IR_MakeENDWHILE(); };
+a_savejump			: { int_stackPush(&jumpStack, program_counter); }
 
 assignstmt      : IDTKN ASSIGNTKN expstmt { IR_MakeASSIGN($1); }
 								| IDTKN LEFTBTKN expstmt  RIGHTBTKN a_range ASSIGNTKN expstmt { IR_MakeARGYASSIGN($1); }; //NOT YET
@@ -1289,13 +1286,13 @@ assignstmt      : IDTKN ASSIGNTKN expstmt { IR_MakeASSIGN($1); }
 a_range					: {IR_MakeVER();} 
 
 iostmt          : READTKN var  { IR_MakeIOREAD($2); }
-				| WRITETKN expstmt {IR_MakeIOWRITE(); };
+								| WRITETKN expstmt {IR_MakeIOWRITE(); };
 									
-var     : identifier 
-				| identifier LEFTBTKN expstmt RIGHTBTKN { IR_MakeVER(); };
-				| identifier LEFTBTKN expstmt RIGHTBTKN  LEFTBTKN expstmt {IR_MakeMULTIVER($1);}  RIGHTBTKN;
+var     				: identifier 
+								| identifier LEFTBTKN expstmt RIGHTBTKN { IR_MakeVER(); };
+								| identifier LEFTBTKN expstmt RIGHTBTKN  LEFTBTKN expstmt {IR_MakeMULTIVER($1);}  RIGHTBTKN;
 
-identifier		: IDTKN;
+identifier			: IDTKN;
 			
 expstmt         : expstmt compoperator {  EXP_PushOperator($2); } exp { IR_MakeEXP(); } 
 								| exp;
@@ -1303,27 +1300,26 @@ expstmt         : expstmt compoperator {  EXP_PushOperator($2); } exp { IR_MakeE
 compoperator    : LTTKN | LTETKN | GTTKN | GTETKN | EQUALTKN | NOTEQUALTKN | ORTKN | ANDTKN;
 
 exp             : exp additiveoperator { EXP_PushOperator($2); } term { IR_MakeEXP();} 
-				| term;
+								| term;
 additiveoperator: MINUSTKN | PLUSTKN;
 
-term    : term TIMESTKN { EXP_PushOperator($2); }  factor  { IR_MakeEXP();}
-				| term DIVTKN { EXP_PushOperator($2); } factor  { IR_MakeEXP();}
-				| factor
+term    				: term TIMESTKN { EXP_PushOperator($2); }  factor  { IR_MakeEXP();}
+								| term DIVTKN { EXP_PushOperator($2); } factor  { IR_MakeEXP();}
+								| factor
 
-values  : INTVALTKN 
-				| DOUBLEVALTKN  
-				| STRINGVALTKN   
-				| TRUETKN  
-				| FALSETKN;
+values  				: INTVALTKN 
+								| DOUBLEVALTKN  
+								| STRINGVALTKN   
+								| TRUETKN  
+								| FALSETKN;
 
-factor	: LEFTPTKN { /* fake bottom */ } exp { /* fake bottom */ } RIGHTPTKN
-				| var  { EXP_PushOperand($1, "var"); }
-				| values { EXP_PushOperand($1, "const"); }
-				| callstmt {  IR_MakeCALL($1); };
+factor					: LEFTPTKN { /* fake bottom */ } exp { /* fake bottom */ } RIGHTPTKN
+								| var  { EXP_PushOperand($1, "var"); }
+								| values { EXP_PushOperand($1, "const"); }
+								| callstmt {  IR_MakeCALL($1); };
 
 callstmt        : IDTKN { IR_MakeERA($1);} LEFTPTKN args RIGHTPTKN  { PRG_GetSymbol($1, "global", "func"); };
 
-// Me falta la semantica de variables
 args            : /* empty */ | arglist
 arglist         : arglist COMMATKN exp {IR_MakeSTACKPUSH(); } | exp {IR_MakeSTACKPUSH(); };
 
@@ -1334,7 +1330,6 @@ returnstmt      : RETURNFUNCTKN expstmt { IR_MakeRETURN(); };
 
 int yyerror(char * message)
 	
-{ fprintf(stderr,"at line %d: %s\n",g_lineno,message);
-  //fprintf(outputFile,"token: %d\n\n", yychar);
-  return 1;
+{ fprintf(stderr,"line number: %d %s\n",g_lineno,message);
+return 1;
 }
