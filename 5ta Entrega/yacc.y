@@ -17,7 +17,6 @@
 static stack typeStack;
 static stack operandStack;
 static stack operatorStack;
-static stack dimensionStack;
 static stack cipherStack;
 static int_stack jumpStack;
 static struct symbol SymbolTable[SYMBOL_TABLE_SIZE];
@@ -394,7 +393,6 @@ void PRG_Initialize(){
 	stackInit(&operandStack);
 	stackInit(&typeStack);
 	stackInit(&operatorStack);
-	stackInit(&dimensionStack);
 	int_stackInit(&jumpStack);
 	init_hash_table(SymbolTable);
 	

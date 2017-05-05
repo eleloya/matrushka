@@ -1,0 +1,63 @@
+program ::= secrets a_1 vardeclarations functions a_2 | secrets a_1 functions a_2
+
+secrets ::= secrets secret | secret?
+secret ::= 'cipher' STRINGVALTKN ',' STRINGVALTKN a_3 ';'
+
+functions ::= functions function | function
+
+function  ::= 'func' type ':' IDTKN a_4 '(' params? ')' ':'  funcbody? a_5 'endf'
+
+funcbody  ::= vardeclarations blockstmts | blockstmts
+
+params    ::= paramlist
+paramlist ::= paramlist ',' param | param
+param     ::= type IDTKN a_6
+						
+vardeclarations ::= vardeclarations vardeclaration ';' | vardeclaration ';'
+
+vardeclaration  ::= type IDTKN a_7 | type IDTKN '[' INTVALTKN ']' a_8  | type IDTKN '[' INTVALTKN ']' '[' INTVALTKN  ']' a_9
+
+type  ::= 'int' | 'double' | 'string' | 'bool'
+
+blockstmts ::= blockstmts blockstmt | blockstmt
+
+blockstmt  ::= assignstmt ';' | returnstmt ';' | ifstmt | iterstmt | iostmt ';' | callstmt ';'
+
+ifstmt ::= 'if' '(' expstmt a_9 ')' ':' blockstmts 'endi' a_11 | 'if' '(' expstmt a_9 ')' ':' blockstmts 'else' a_10 blockstmts 'endi' a_12
+
+iterstmt   ::= 'while' a_13 '(' expstmt a_14 ')' ':'  blockstmts 'endw' a_15
+
+assignstmt  ::= IDTKN '=' expstmt a_16 | IDTKN '[' expstmt  ']' a_17 '=' expstmt a_18 | IDTKN '[' expstmt  ']' '[' expstmt a_19 ']' '=' expstmt a_18 
+
+iostmt  ::= 'read' var a_19 | 'write' expstmt a_20
+									
+var ::= identifier | identifier '[' expstmt ']' a_21  | identifier '[' expstmt ']'  '[' expstmt a_22  ']'
+
+identifier	::= IDTKN
+
+expstmt  ::= expstmt compoperator a_23 exp a_24 | exp
+
+compoperator ::= '<' | '<=' | '>' | '>=' | '==' | '!=' | '||' | '&&'
+
+exp  ::= exp additiveoperator a_23 term a_24 | term
+
+additiveoperator ::= '-' | '+'
+
+term  ::= term '*' a_23 factor a_24
+	| term '/' a_23 factor a_24
+	| factor
+
+values ::= INTVALTKN | DOUBLEVALTKN  | STRINGVALTKN | TRUETKN | FALSETKN
+
+factor ::= '(' exp ')'
+	  | var a_25
+	  | values a_26
+	  | callstmt a_27
+
+callstmt ::= IDTKN a_28 '(' args? ')' a_29
+
+args            ::= arglist
+arglist         ::= arglist ',' exp a_30 | exp a_31
+
+returnstmt      ::= 'return' expstmt a_32
+		

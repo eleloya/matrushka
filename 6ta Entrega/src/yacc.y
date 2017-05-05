@@ -3,7 +3,7 @@
 #include "util/int_stack.c"
 #include "util/hash.c"
 #define YYSTYPE char *
-#define VERBOSE 0
+#define VERBOSE 1
 #define MAX_TMP_VARIABLES 5000
 #define MAX_PROGRAM_SIZE 10000
 
@@ -16,7 +16,6 @@
 static stack typeStack;
 static stack operandStack;
 static stack operatorStack;
-static stack dimensionStack;
 static stack cipherStack;
 static int_stack jumpStack;
 static struct symbol SymbolTable[SYMBOL_TABLE_SIZE];
@@ -417,8 +416,6 @@ void PRG_Initialize(){
 	stackInit(&operandStack);
 	stackInit(&typeStack);
 	stackInit(&operatorStack);
-	stackInit(&dimensionStack);
-	int_stackInit(&jumpStack);
 	init_hash_table(SymbolTable);
 	
 	for(int i=0;i<MAX_PROGRAM_SIZE;i++)

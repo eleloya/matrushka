@@ -1,12 +1,8 @@
-int a;
-
-func int:pinnumber():
-	return a;
-endf
+int globali;
 
 func int:main():
-		a = 4246;
-		write "Tarjeta debito";
-		write "el pin es: ";
-		write pinnumber();
+		int x;
+		int y;
+		double a;
+		return 0;
 endf
