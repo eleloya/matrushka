@@ -38,7 +38,10 @@ array_offset = 0
 marray = []
 
 #Auxiliary Functions
-
+# Esta funcion recibe un operando que puede ser
+# una constante o una direccion a una variable o vector o matriz
+# El que quiero utilizar el valor no le interesa donde esta almacenado
+# Le manda la chamba a esta funcion
 def getValue(operand):
     currentstack_base = sum(esp[:-1])   
        
@@ -71,6 +74,7 @@ def getValue(operand):
         operand = str(0)
     
     return operand
+
 
 def save_in(address,value):
     if address.startswith("["):
