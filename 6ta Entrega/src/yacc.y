@@ -94,8 +94,8 @@ void PRG_SaveIRCode(){
 		fprintf(outputFile,"%s\n",IRCode[i]);
 }
 
-// Esta funcion representa un cubo semantico
-// Recibe un operador y sus operandos
+// REGLA: expstmt, exp, term
+// Esta funcion representa un cubo semantico que recibe un operador y sus operandos
 // Regresa el tipo resultante
 char * PRG_SemanticCube(char* op, char *operand1, char *operand2){
 	if (NULL==op || NULL==operand1 || NULL==operand2){
@@ -103,6 +103,10 @@ char * PRG_SemanticCube(char* op, char *operand1, char *operand2){
 		printf("FATAL: Null reference.\n");
 		exit(EXIT_FAILURE);
 	}
+	
+	if(VERBOSE)
+		printf("LINE: %-4d PRG_SemanticCube(%s,%s,%s)\n", g_lineno, op, operand1, operand2);
+	
 		
 	char *result_type;
 	char *opcode;
@@ -247,23 +251,16 @@ char * PRG_SemanticCube(char* op, char *operand1, char *operand2){
 	return strdup("error");
 }
 
-/*
-* Used in the grammar rules (program,function) for changing the scope.
-* It is important for example to save a new symbol.
-* The program needs to know to wich scope the symbol belongs.
-* Every time the grammar encounters a new "function" SetScope gets called.
-*
-*/
+// REGLA: program, function
+// Esta funcion mantiene la global "scope" actualizada acerca de en que funcion 
+// se cuentra el parser.
 void PRG_SetScope(char *scopeName){
+	if(VERBOSE)
+		printf("LINE: %-4d PGR_SetScope(%s)\n", g_lineno, scopeName);
+	
 	if (NULL==scopeName){
 		printf("LINE: %-4d  CALL: PRG_SetScope(NULL)\t", g_lineno);
 		printf("FATAL: Null reference.\n");
-		exit(EXIT_FAILURE);
-	}
-	
-	if (strcmp(scopeName, "")==0){
-		printf("LINE: %-4d  CALL: PRG_SetScope(\"\")\t", g_lineno);
-		printf("FATAL: Can't set a empty scope\n");
 		exit(EXIT_FAILURE);
 	}
 	
@@ -271,28 +268,32 @@ void PRG_SetScope(char *scopeName){
 		free(scope);
 
 	scope = strdup(scopeName);
-	
-	if(VERBOSE)
-		printf("LINE: %-4d PGR_SetScope(%s)\n", g_lineno, scopeName);
 }
 
-/*
-* Used in the grammar rules (param,vardeclaration,stmt) for checking current scope.
-* Important before checking to wich scope should we save the symbol to.
-*
-*/
+// REGLA: param, vardeclaration, stmt
+// Esta funcion accesa y regresa el valo de la global "scope".
+// Para guardar cualquier identifier en el symbolTable es necesario tener su scope
 char * PRG_GetScope(){
 	if(VERBOSE)
-		printf("LINE: %-4d PGR_GetScope() -> %s\n", g_lineno, scope);
+		printf("LINE: %-4d PGR_GetScope()\n", g_lineno);
 	
 	return scope;
 }
 
+// REGLA: callstmt
+// Esta funcion recibe el identificador de un scope (function_name o global)
+// Regresa el numero de variables que se registraron para dicho scope
 int PRG_GetFunctionVariablesNum(char *identifier){
-	//Gotta search for all the identifiers wich context is that of "identifier"
-	//return that but minus one
+	if (NULL==identifier){
+		printf("LINE: %-4d  CALL: PRG_GetFunctionVariablesNum(NULL)\t", g_lineno);
+		printf("FATAL: Null reference.\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	if(VERBOSE)
+		printf("LINE: %-4d PRG_GetFunctionVariablesNum(%s)\n", g_lineno, identifier);
+	
 	int era_size = 0;
-	//This takes a little while tho
 	
 	for(int i=0;i<SYMBOL_TABLE_SIZE;i++){
 		if(NULL != SymbolTable[i].value){
@@ -304,9 +305,12 @@ int PRG_GetFunctionVariablesNum(char *identifier){
 	return era_size;
 }
 
+// REGLA: program
+// Esta funcion genera una seccion de datos al final del codigo intermedio
+// La maquina virtual de matrushka necesita saber cuantas variables tiene cada funcion
 void PRG_ERAUpdate(){
-	/* Esta rutina es para hacer anotaciones al final del IR_CODE
-	   que el VM debe de leer */
+	if(VERBOSE)
+		printf("LINE: %-4d PRG_ERAUpdate()\n", g_lineno);
 	
 	char *function_name;
 	int function_era_size;
@@ -321,44 +325,26 @@ void PRG_ERAUpdate(){
 				function_name = SymbolTable[i].value;
 				function_era_size = PRG_GetFunctionVariablesNum(function_name);
 				sprintf(function_era_size_string, "%d", function_era_size);
-				
 				IRCode[program_counter] = concat("era_size_",concat(function_name,concat(": ", function_era_size_string)));
 				program_counter++;
 			}
 		}
 	}
-	
-	
-	
-	//Esta rutina es para hacerlo inline en el IR_CODE
-	/*
-	char *function_name;
-	int function_era_size;
-	char *function_era_size_string;
-	char *era_string;
-	
-	for(int i=0;i<SYMBOL_TABLE_SIZE;i++){
-		if(NULL != SymbolTable[i].value){
-			if(strcmp(SymbolTable[i].symbolKind,"func")==0){
-				function_name = SymbolTable[i].value;
-				function_era_size = PRG_GetFunctionVariablesNum(function_name);
-				era_string = concat("*era_size_",concat(function_name,"*"));
-				printf("%s: %d\n", function_name, function_era_size);
-				//Now scan the IR For ocurrences of *era_size_FUNCNAME*
-				//replace it with function_era_size
-				for(int j=0;j<program_counter;j++){
-					if(strstr(era_string,IRCode[j])){
-						printf("On line %d there is a era_size reference for %s \n", j, era_string);
-					}
-				}
-			}
-		}
-	}	
-
-	*/
 }
 
+// REGLA: vardeclarations, params, factor
+// Esta funcion se llama cada que se declara un identificador o genera una variable temporal
+// Lo guarda en en el symbol table
 void PRG_SaveSymbol(char *typeName, char *identifierName, char *scopeName, char *symbolKind){
+	if (NULL==typeName || NULL==identifierName || NULL==scopeName || NULL==symbolKind ){
+		printf("LINE: %-4d  CALL: PRG_SaveSymbol(NULL)\t", g_lineno);
+		printf("FATAL: Null reference.\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	if(VERBOSE)
+		printf("LINE: %-4d PRG_SaveSymbol()\n", g_lineno);
+	
 	int response;
 
 	response = insert(SymbolTable, typeName, identifierName, scopeName, symbolKind);
@@ -371,20 +357,29 @@ void PRG_SaveSymbol(char *typeName, char *identifierName, char *scopeName, char 
 	
 }
 
+// REGLA: exp, callstmt
+// Esta funcion se llama cada que se hace referencia a algun identificador
+// Comprueba que el identificador se encuentre en el symbol table
 void PRG_GetSymbol(char *identifierName, char *scopeName, char *symbolKind){
-	/*
-	We look for the same identifier both in the given scope and the global scope.
-	*/
 	int response_func;
 	int response_local;
 	int response_global;
 	char *kind;
 	
+	if (NULL==identifierName || NULL==scopeName || NULL==symbolKind){
+		printf("LINE: %-4d  CALL: PRG_GetSymbol(NULL)\t", g_lineno);
+		printf("FATAL: Null reference.\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	if(VERBOSE)
+		printf("LINE: %-4d PRG_GetSymbol()\n", g_lineno);
+	
+	
 	//Function needs its own logic
 	if(strcmp(symbolKind,"func")==0){
 		response_func = member(SymbolTable, identifierName, scopeName);
 		kind = memberKind(SymbolTable, identifierName, scopeName);
-		//  Check for identifierName existance on global scope
 		//  Also check for identifierName to be of type "func" (maybe the user is calling a identifier in global that is not a func)
 		if(response_func==0 || strcmp(kind,"func")!=0){
 			printf("LINE: %-4d CALL: PRG_GetSymbol(%s,%s,%s)\n", g_lineno,identifierName, scopeName, symbolKind);
@@ -399,6 +394,7 @@ void PRG_GetSymbol(char *identifierName, char *scopeName, char *symbolKind){
 	int response_ary_local =  member(SymbolTable, concat(identifierName,"_0"), scopeName);
 	int response_ary_global = member(SymbolTable, concat(identifierName,"_0"), "global");
 	
+	//Only generate error when the variable was neither local nor global nor array
 	if( response_local==0 && response_global==0 && response_ary_local==0 && response_ary_global==0 ){
 		printf("LINE: %-4d CALL: PRG_GetSymbol(%s,%s,%s)\n", g_lineno,identifierName, scopeName, symbolKind);
 		printf("FATAL: Trying to access undeclared variable\n");
@@ -409,7 +405,13 @@ void PRG_GetSymbol(char *identifierName, char *scopeName, char *symbolKind){
 	//printf("Checking for '%s' symbol existance on scope %s of type %s\n", identifierName, scopeName, symbolKind);
 }
 
+// REGLA: program
+// Esta funcion se llama al inicio del programa, se encarga de inicializar
+// las estructuras de datos. Tambien genera la primera instruccion de IR :)
 void PRG_Initialize(){
+	if(VERBOSE)
+		printf("LINE: %-4d PRG_Initialize()\n", g_lineno);
+	
 	PRG_SetScope("global");
 	
 	stackInit(&operandStack);
@@ -1000,13 +1002,11 @@ void IR_MakeRETURN(){
 	program_counter++;
 }
 
+// REGLA: callstmt
 void IR_MakeERA(char *identifier){
 	//This shit has to generate code that says how much space to push into the stackfram
 	//How much? Well that depends on the number of variables (temps,vars and params for a function)
 	
-	//int era_size = PRG_GetFunctionVariablesNum(identifier);
-	//char era_size_string[MAX_TMP_VARIABLES];
-	//sprintf(era_size_string, "%d", era_size);
 	
 	//This brings up a problem. Cant have variabels having the prefix erasize_
 	char *era_size_string = concat("era_size_", identifier);
@@ -1253,10 +1253,9 @@ Atributos para llamadas de funciones:
 	//TO-DO pasar las dos funciones de al final para el final de main.c
 	//que pedo con los programas sin secerto.. checar si se awita el shift reduce
 	//remplazar esa funcion de al final con una seccion de los tamaños del ERA:
-program   		: secrets {  PRG_Initialize(); } vardeclarations functions eraupdate a_prgend
-							| secrets {  PRG_Initialize(); } functions eraupdate a_prgend
-eraupdate 		: { PRG_ERAUpdate(); }
-a_prgend			: { if(VERBOSE){ DBG_PrintSymbolTable(SymbolTable); DBG_PrintIRCode(); } PRG_EncryptCode(); PRG_SaveIRCode(); }
+program   		: secrets {  PRG_Initialize(); } vardeclarations functions a_prgend
+							| secrets {  PRG_Initialize(); } functions a_prgend
+a_prgend			: { PRG_ERAUpdate(); if(VERBOSE){ DBG_PrintSymbolTable(SymbolTable); DBG_PrintIRCode(); } PRG_EncryptCode(); PRG_SaveIRCode(); }
 
 secrets				: secrets secret
 							| secret
