@@ -438,9 +438,21 @@ void PRG_Initialize(){
 	program_counter++;
 }
 
+// REGLA: secret
+// Esta funcion se llama cada vez que el usuario definio algun cifrado
+// Guarda los tipos de cifrado en un stack global.
 void PRG_PushCipher(char * cipher_algorithm, char * cipher_key){
 	char *cipher_key_clean;
 	static int cipher_first_time = TRUE;
+	
+	if (NULL==cipher_algorithm || NULL==cipher_key){
+		printf("LINE: %-4d  CALL: PRG_PushCipher(NULL)\t", g_lineno);
+		printf("FATAL: Null reference.\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	if(VERBOSE)
+		printf("LINE: %-4d PRG_PushCipher()\n", g_lineno);
 	
 	if(strstr(cipher_algorithm, "aes256")){
 		cipher_algorithm = "-aes-256-cbc";
@@ -449,7 +461,6 @@ void PRG_PushCipher(char * cipher_algorithm, char * cipher_key){
 	}else if(strstr(cipher_algorithm, "des")){
 		cipher_algorithm = "-des-cbc";
 	}else{
-		//ERROR
 		printf("LINE: %-4d CALL: PRG_PushCipher(%s, %s)\n", g_lineno, cipher_algorithm, cipher_key);
 		printf("FATAL: Unknow algorithm %s. Can only do aes256, blowfish and des \n", cipher_algorithm);
 		exit(EXIT_FAILURE);
@@ -469,12 +480,19 @@ void PRG_PushCipher(char * cipher_algorithm, char * cipher_key){
 	stackPush(&cipherStack, cipher_key_clean);
 }
 
+// REGLA: program
+// Esta funcion es la encarga de encriptar el codigo intermedio
+// Utiliza el cifrado y el passphrase que el usuario definio
+// Hace uso de openssl para cifrar. 
+// Regla de ORO: Dont role your own crypto ;)
 void PRG_EncryptCode(){
 	char *cipher_algorithm;
 	char *cipher_key;
 	char *command;
 	char *tmp_string[2];
 	
+	if(VERBOSE)
+			printf("LINE: %-4d PRG_EncryptCode()\n", g_lineno);
 	while(cipherStack.size!=0){
 		cipher_key = stackPop(&cipherStack);
 		cipher_algorithm = stackPop(&cipherStack);
@@ -532,83 +550,96 @@ void PRG_EncryptCode(){
 		
 		fclose(cryptedfile);
 		free(buffer);
-		
-		//Now we delete the file /tmp/babushka.sec
 	}
 }
 
-/*
-* Used in the grammar rules (expcmp,exp,term,factor) for semantic analysis.
-*
-*/
-
-//TO-DO Meter estos dos a EXP_PushOperand
+// REGLA: REGLA(PushOperand)
+// Subrutina de EXP_PushOperand
+// Se encarga de pushear al typeStack el tipo del identificador
 void pushType(char *value, char *symbolKind){
 	char *factorType;
 	
+	if (NULL==value || NULL==symbolKind){
+		printf("LINE: %-4d  CALL: pushType(NULL)\t", g_lineno);
+		printf("FATAL: Null reference.\n");
+		exit(EXIT_FAILURE);
+	}
 	
-	if(strcmp(symbolKind,"const")==0){ // then is a constant
+	if(VERBOSE)
+		printf("LINE: %-4d pushType()\n", g_lineno);
+	
+	if(strcmp(symbolKind,"const")==0){ 
 		factorType = getTypeFromValue(value);
-		//printf("Retrived type for %s is %s\n\n", value, factorType);
-	}else{ // then is a variable or a function
+	}else{ // then it is a variable or a function
 		factorType = memberType(SymbolTable, value, PRG_GetScope());
 		if(!factorType)
 			factorType = memberType(SymbolTable, concat(value,"_0"), PRG_GetScope());
-		//printf("Retrived type for %s is %s in scope: %s\n\n", value, factorType, PRG_GetScope());
 	}
 		
-	// We must transform the type into a int because these stack only holds integers
 	stackPush(&typeStack,factorType);
 }
 
+// REGLA: REGLA(PushOperand)
+// Subrutina de EXP_PushOperand
+// Se encarga de pushear al typeStack el operador
 void pushOperand(char *operand, char *kind){
 	int offset;
 	char offset_string[MAX_PROGRAM_SIZE];
 	
+	if (NULL==operand || NULL==kind){
+		printf("LINE: %-4d  CALL: pushOperand(NULL)\t", g_lineno);
+		printf("FATAL: Null reference.\n");
+		exit(EXIT_FAILURE);
+	}
 	
+	if(VERBOSE)
+		printf("LINE: %-4d pushOperand()\n", g_lineno);
 
-	//A lo mejor deberia checar que sea permitido. Pero no pasarian por flex ni bison...
 	if(strcmp(kind,"func")==0){
 		stackPush(&operandStack, operand);
 	}else if(strcmp(kind,"const")==0){
 		stackPush(&operandStack, operand);
-	}else{
-		
-	//Else means that it is not a function, it is not a constnat.
-	//So it means it must be within reach of the stack.
-	//We can calculate that if we know the index of the variable in the stack
-	offset = memberNumber(SymbolTable, operand, PRG_GetScope());
-	sprintf(offset_string, "%d", offset);
+	}else{ // Then it is a varible.. auch
+		offset = memberNumber(SymbolTable, operand, PRG_GetScope());
+		sprintf(offset_string, "%d", offset);
 
-	int response_global = member(SymbolTable, operand, "global");
-	int response_local = member(SymbolTable, operand, PRG_GetScope());
-	int response_ary_global = member(SymbolTable, concat(operand,"_0"), PRG_GetScope());
-	int response_ary_local = member(SymbolTable, concat(operand,"_0"), PRG_GetScope());
-	if(response_local){
-			offset = memberNumber(SymbolTable, operand, PRG_GetScope());	
+		int response_global = member(SymbolTable, operand, "global");
+		int response_local = member(SymbolTable, operand, PRG_GetScope());
+		int response_ary_global = member(SymbolTable, concat(operand,"_0"), PRG_GetScope());
+		int response_ary_local = member(SymbolTable, concat(operand,"_0"), PRG_GetScope());
+		if(response_local){
+				offset = memberNumber(SymbolTable, operand, PRG_GetScope());	
+				sprintf(offset_string, "%d", offset);
+				operand = concat("(",concat("\%STACK",concat("+",concat(offset_string,")"))));
+		}else if(response_global){
+			offset = memberNumber(SymbolTable, operand, "global");	
 			sprintf(offset_string, "%d", offset);
-			operand = concat("(",concat("\%STACK",concat("+",concat(offset_string,")"))));
-	}else if(response_global){
-		offset = memberNumber(SymbolTable, operand, "global");	
-		sprintf(offset_string, "%d", offset);
-		operand = concat("(",concat("\%GLOBALS",concat("+",concat(offset_string,")"))));
-	}else if(response_ary_local){
-		offset = memberNumber(SymbolTable, concat(operand,"_0"), PRG_GetScope());	
-		sprintf(offset_string, "%d", offset);
-		operand = concat("[",concat("\%STACK",concat("+",concat(offset_string,"]"))));
-	}else if(response_ary_global){
-		offset = memberNumber(SymbolTable, concat(operand,"_0"), "global");	
-		sprintf(offset_string, "%d", offset);
-		operand = concat("[",concat("\%GLOBALS",concat("+",concat(offset_string,"]"))));
-	}
+			operand = concat("(",concat("\%GLOBALS",concat("+",concat(offset_string,")"))));
+		}else if(response_ary_local){
+			offset = memberNumber(SymbolTable, concat(operand,"_0"), PRG_GetScope());	
+			sprintf(offset_string, "%d", offset);
+			operand = concat("[",concat("\%STACK",concat("+",concat(offset_string,"]"))));
+		}else if(response_ary_global){
+			offset = memberNumber(SymbolTable, concat(operand,"_0"), "global");	
+			sprintf(offset_string, "%d", offset);
+			operand = concat("[",concat("\%GLOBALS",concat("+",concat(offset_string,"]"))));
+		}
 	
 	stackPush(&operandStack, operand);	
 	}
 }
 
+// REGLA: factor, expcmp, exp, term
+// Esta funcion se encarga de pushear los operandos al stack
 void EXP_PushOperand(char *operand, char *symbolKind){
-	//TO-DO Check for NULLS
+	if (NULL==operand || NULL==symbolKind){
+		printf("LINE: %-4d  CALL: EXP_PushOperand(NULL)\t", g_lineno);
+		printf("FATAL: Null reference.\n");
+		exit(EXIT_FAILURE);
+	}
 	
+	if(VERBOSE)
+		printf("LINE: %-4d EXP_PushOperand(%s,%s)\n", g_lineno, operand,symbolKind);
 
 	//Check for the existance of a variable before even continuing.
 	if(strcmp(symbolKind,"var")==0)
@@ -617,48 +648,25 @@ void EXP_PushOperand(char *operand, char *symbolKind){
 	//Later is the same for both expressions
 	pushType(operand, symbolKind); 
 	pushOperand(operand, symbolKind);
-	
-	if(VERBOSE)
-		printf("LINE: %-4d EXP_PushOperand(%s,%s)\n", g_lineno, operand,symbolKind);
 }
 
+// REGLA: expcmp, exp, term
+// Esta funcion se encarga de pushear los operadores al stack
 void EXP_PushOperator(char *op){
-	//Always checking
+	//Always be checking
 	if (NULL==op){
 		printf("LINE: %-4d  CALL: EXP_PushOperator(NULL)\n", g_lineno);
 		printf("FATAL: Null reference.\n");
 		exit(EXIT_FAILURE);
 	}
 	
-	stackPush(&operatorStack,op);
-	
 	if(VERBOSE)
 		printf("LINE: %-4d EXP_PushOperator(%s)\n", g_lineno, op);	
-}
-
-void IR_AddGotoF(char *operand){
-	if(VERBOSE)
-		printf("LINE: %-4d IR_AddGotoF(%s)\n", g_lineno, operand);
 	
-	char *instruction = concat("GTOF ", operand);
-	IRCode[program_counter] = instruction;
-	int_stackPush(&jumpStack, program_counter);
-	program_counter++;
+	stackPush(&operatorStack,op);
 }
 
-void IR_AddASSIGN(char *identifier, char *expression){
-	if(VERBOSE)
-		printf("LINE: %-4d IR_AddASSIGN(%s,%s)\n", g_lineno, identifier,expression);
-	// "= " + expression + " " + identifier
-	// = T1 A
-	char * instruction = concat("MOVE ", expression);
-	instruction = concat(instruction, " ");
-	instruction = concat(instruction, identifier);
-	
-	IRCode[program_counter] = instruction;
-	program_counter++;
-}
-
+// Esta funcion se encarga de generar los labels de que ya "empezo una nueva funcion"
 void IR_MakeFUNCTION(char *identifier){
 	char *instruction = concat("_", identifier);
 	instruction = concat(instruction, ":");
@@ -666,6 +674,7 @@ void IR_MakeFUNCTION(char *identifier){
 	program_counter++;
 }
 
+// Esta funcion se encarga de generar el label de una funcion ya termino
 void IR_MakeFUNCTIONEND(){
 	char *instruction;
 	
@@ -684,7 +693,17 @@ void IR_MakeFUNCTIONEND(){
 	program_counter++;
 }
 
-void IR_AddIOREAD(char * identifier){
+// Esta funcion se encarga de checar la semantica para el read y llama a la generacion de codigo intermedio
+void IR_MakeIOREAD(char *identifier){
+	if(VERBOSE)
+		printf("LINE: %-4d IR_MakeIOREAD(%s)\n", g_lineno, identifier);	
+	
+	//Semantic Check
+	//Look for the identifier to be declared previously in the symbol table
+	//Otherwise were would we save what we read
+	//This is an easy one, is it not? ;)
+	PRG_GetSymbol(identifier, PRG_GetScope(), "var"); 
+	
 	char *identifier_type;
 	char *instruction;
 	
@@ -722,6 +741,7 @@ void IR_AddIOREAD(char * identifier){
 	program_counter++;
 }
 
+// Esta funcion se encarga de generar el codigo intermedio para escritura a pantalla
 void IR_MakeIOWRITE(){
 	char *expression_type;
 	char *expression;
@@ -735,8 +755,6 @@ void IR_MakeIOWRITE(){
 	if(VERBOSE)
 		printf("LINE: %-4d IR_MakeIOWRITE(%s)\n", g_lineno, expression);
 	
-	
-	//I will not make a IR_AddIOWRITE. I can keep it here just fine.
 	if(strcmp(expression_type,"int")==0){
 		instruction = concat("IPUT ", expression);
 	}else if(strcmp(expression_type,"double")==0){
@@ -751,27 +769,15 @@ void IR_MakeIOWRITE(){
 	program_counter++;
 }
 
-void IR_MakeIOREAD(char *identifier){
-	if(VERBOSE)
-		printf("LINE: %-4d IR_MakeIOREAD(%s)\n", g_lineno, identifier);	
-	
-	//Semantic Check
-	//Look for the identifier to be declared previously in the symbol table
-	//Otherwise were would we save what we read
-	//This is an easy one, is it not? ;)
-	PRG_GetSymbol(identifier, PRG_GetScope(), "var"); 
-	
-	
-	IR_AddIOREAD(identifier);
-}
 
+// Esta funcion se encarga de generar el codigo intermedio para asignacion a arreglos
 void IR_MakeARGYASSIGN(char *identifier){
 	char *identifier_type;
 	char *expression_type;
 	char *expression;
 	
 	char *index_expression;
-	//Semantic chec
+	//Semantic check
 	//Look for the identifier to be declared previously
 	PRG_GetSymbol(concat(identifier,"_0"), PRG_GetScope(), "var"); 
 	
@@ -810,6 +816,7 @@ void IR_MakeARGYASSIGN(char *identifier){
 	program_counter++;
 }
 
+// Esta funcion se encarga de generar el codigo intermedio para asignacion normal
 void IR_MakeASSIGN(char *identifier){
 	char *identifier_type;
 	char *expression_type;
@@ -862,10 +869,17 @@ void IR_MakeASSIGN(char *identifier){
 		identifier = concat("[",concat("\%GLOBALS",concat("+",concat(offset_string,"]"))));
 	}
 
-	//Code generation
-	IR_AddASSIGN(identifier,expression);
+	// "= " + expression + " " + identifier
+	// = T1 A
+	char * instruction = concat("MOVE ", expression);
+	instruction = concat(instruction, " ");
+	instruction = concat(instruction, identifier);
+	
+	IRCode[program_counter] = instruction;
+	program_counter++;
 }
 
+// Esta funcion se encarga de generar el codigo intermedio para ciclos
 void IR_MakeWHILE(){
 	char *expression;
 	char *expression_type;
@@ -886,6 +900,7 @@ void IR_MakeWHILE(){
 	program_counter++;
 }
 
+// Cierra el ciclo
 void IR_MakeENDWHILE(){
 	// The stack looks like this here
 	// 2: La direccion del gotof
@@ -910,6 +925,8 @@ void IR_MakeENDWHILE(){
 	program_counter++;
 }
 
+// REGLA: IF
+// Genera codigo para condicionales
 void IR_MakeIF(){
 	char *typeName = stackPop(&typeStack);
 	char *operand = stackPop(&operandStack);
@@ -924,10 +941,15 @@ void IR_MakeIF(){
 		exit(EXIT_FAILURE);
 	}
 	
-	//Code Generation Subroutine
-	IR_AddGotoF(operand);
+	//Code generation
+	char *instruction = concat("GTOF ", operand);
+	IRCode[program_counter] = instruction;
+	int_stackPush(&jumpStack, program_counter);
+	program_counter++;
 }
 
+// REGLA: IF
+// Genera codigo para condicionales else
 void IR_MakeELSEIF(){
 	int previous_if_address = int_stackPop(&jumpStack);
 	
@@ -953,6 +975,8 @@ void IR_MakeELSEIF(){
 	free(previous_if_instruction);
 }
 
+// REGLA: IF
+// Cierra la condicional
 void IR_MakeENDIF(){
 	
 	int previous_if_address = int_stackPop(&jumpStack);
@@ -976,6 +1000,9 @@ void IR_MakeENDIF(){
 	IRCode[previous_if_address] = new_instruction;
 }
 
+// REGLA: returnstmt
+// Genera codigo para return de una funcion
+// Hace el chequeo semantico tmb
 void IR_MakeRETURN(){
 	char *identifier_type;
 	char *expression_type;
@@ -1003,12 +1030,8 @@ void IR_MakeRETURN(){
 }
 
 // REGLA: callstmt
+// Hace saber a la maquina virtual que ahi viene una funcion
 void IR_MakeERA(char *identifier){
-	//This shit has to generate code that says how much space to push into the stackfram
-	//How much? Well that depends on the number of variables (temps,vars and params for a function)
-	
-	
-	//This brings up a problem. Cant have variabels having the prefix erasize_
 	char *era_size_string = concat("era_size_", identifier);
 	char *instruction = concat("ERAS *", era_size_string);
 	instruction = concat(instruction,"*");
@@ -1016,6 +1039,8 @@ void IR_MakeERA(char *identifier){
 	program_counter++;
 }
 
+// REGLA: callstmt
+// Hace saber a la maquina virtual los parametros de una funcion
 void IR_MakeSTACKPUSH(){
 	char *expression_type;
 	char *expression;
@@ -1034,6 +1059,8 @@ void IR_MakeSTACKPUSH(){
 	program_counter++;
 }
 
+// REGLA: callstmt
+// Genera codigo para llamado de funciones
 void IR_MakeCALL(char *identifier){ 
 	char *instruction;
 	char suffix_for_temporal_variable[MAX_PROGRAM_SIZE];
@@ -1057,6 +1084,7 @@ void IR_MakeCALL(char *identifier){
 	program_counter++;
 }
 
+// Genera codigo para indicar el offset del arreglo
 void IR_MakeVER(){
 	// Hubo una llamada a[exp]
 	char *operand = stackPop(&operandStack);
@@ -1068,28 +1096,7 @@ void IR_MakeVER(){
 	program_counter++;
 }
 
-void IR_MakeVERA(){
-	// Hubo una llamada a[exp]
-	char *operand = stackPop(&operandStack);
-	stackPop(&typeStack);
-	char *instruction;
-	
-	instruction = concat("VERA ", operand);
-	IRCode[program_counter] = instruction;
-	program_counter++;
-}
-
-void IR_MakeVERB(){
-	// Hubo una llamada a[exp]
-	char *operand = stackPop(&operandStack);
-	stackPop(&typeStack);
-	char *instruction;
-	
-	instruction = concat("VERB ", operand);
-	IRCode[program_counter] = instruction;
-	program_counter++;
-}
-
+// Genera codigo para indicar el offset del arreglo multidimensionado
 void IR_MakeMULTIVER(char *identifier){
 	// Hubo una llamada a[exp][exp]
 	char *operandB = stackPop(&operandStack);
@@ -1101,12 +1108,14 @@ void IR_MakeMULTIVER(char *identifier){
 	stackPop(&typeStack);
 	
 	char *firstDimension = memberType(SymbolTable, identifier, "_dim");
-	
+
 	instruction = concat("MVER ", concat(operandA, concat(" ", concat(operandB, concat(" ", firstDimension)))));
 	IRCode[program_counter] = instruction;
 	program_counter++;
 }
 
+// REGLA: expcmp, exp, term
+// Genera codigo para expresiones
 void IR_MakeEXP(){
 	char *operator = stackPop(&operatorStack);
 	char *operand1_type = stackPop(&typeStack);
@@ -1166,6 +1175,7 @@ void IR_MakeEXP(){
 	
 }
 
+// Se encarga de guardar arreglos en el symbol table
 void save_ary_symbol(char *type, char *identifier, char *range){
 	char identifier_index[MAX_TMP_VARIABLES+1];
 	int rangeindex;
@@ -1179,6 +1189,7 @@ void save_ary_symbol(char *type, char *identifier, char *range){
 	}
 }
 
+// Se encarga de guardar arregos multidimensionados en el symboltable
 void save_multiary_symbol(char *type, char *identifier, char *first_dimension, char *second_dimension){
 	char identifier_index[MAX_TMP_VARIABLES+1];
 	char *array_identifier;
@@ -1217,38 +1228,6 @@ void save_multiary_symbol(char *type, char *identifier, char *first_dimension, c
 //Syntax
 %token LEFTPTKN RIGHTPTKN SEMICOLONTKN LEFTBTKN RIGHTBTKN COMMATKN OPENBLOCKTKN
 
-/*
-		
-$ para absolutos
-% para direcciones
-
-Funciones Auxiliares:
--> Funcion que me regrese el numero de variables locales (var,param,temp) de una funcion.
--> Funcion que me regrese el numero de parametros de una funcion
-
-Atributos para el grammar de funcion:
--> "Generar label" donde empieza la funcion.
-	+ Cambiar la direccion de memoria de la funcion hacia la ubicación en IRCode de la funcion
--> "Generar retorno" al acabar la funcion.
-
-Atributos para llamadas de funciones:
--> Al principio. Verificar que exista. 
--> Al principio. Generar ERA tamaño (segun # de variables)
--> Checar semantica de parametros.
-	-> (a) Tenemos una lista no ordenada de parametros de la funcion
-	-> Recibimos siempre parametro por parametro.
-	-> Podemos generar un stack de tiposParametr desde (a)
-	-> Hacer pop de un parametro (esta en operandsStack y typeStack). 
-	   -> Buscar un elemento en tiposParametro del mismo tipo y eliminarlo.
-	-> Si no se encuentra alguno tipo de tiposParametro: typemismatch.
--> Igual que el anterior. En cada parametro:
-	-> Generar "PARAMETRO, Argumento, Parametro K"
--> Donde acaban los parametros.
-	-> Si el numero de elementos en tiposParametro es distinto a cero: insufficient parameters.
--> Al acabar el function name. Generar un "GOSUB, nombre-proc, dir-de-inicio"
-
-
-*/
 %%
 	//TO-DO pasar las dos funciones de al final para el final de main.c
 	//que pedo con los programas sin secerto.. checar si se awita el shift reduce
