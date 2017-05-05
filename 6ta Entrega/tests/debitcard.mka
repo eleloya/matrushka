@@ -1,8 +1,15 @@
-int globali;
+cipher "aes256", "pass1";
+cipher "des", "pass2";
+
+int a;
+
+func int:pinnumber():
+	return a;
+endf
 
 func int:main():
-		int x;
-		int y;
-		double a;
-		return 0;
+		a = 4246;
+		write "Tarjeta debito";
+		write "el pin es: ";
+		write pinnumber();
 endf
