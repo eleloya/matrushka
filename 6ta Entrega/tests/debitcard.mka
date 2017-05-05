@@ -1,5 +1,6 @@
 cipher "aes256", "pass1";
 cipher "des", "pass2";
+cipher "blowfish", "pass3";
 
 int a;
 

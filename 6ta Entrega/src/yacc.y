@@ -3,7 +3,7 @@
 #include "util/int_stack.c"
 #include "util/hash.c"
 #define YYSTYPE char *
-#define VERBOSE 1
+#define VERBOSE 0
 #define MAX_TMP_VARIABLES 5000
 #define MAX_PROGRAM_SIZE 10000
 
