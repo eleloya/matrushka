@@ -2,11 +2,10 @@
 #include "util/string_stack.c"
 #include "util/int_stack.c"
 #include "util/hash.c"
-#define YYPARSER 
 #define YYSTYPE char *
-#define VERBOSE 1
-#define MAX_TMP_VARIABLES 1024
-#define MAX_PROGRAM_SIZE 1000
+#define VERBOSE 0
+#define MAX_TMP_VARIABLES 5000
+#define MAX_PROGRAM_SIZE 10000
 
 /****************************************************************************/
 /**                                                                        **/
@@ -22,11 +21,8 @@ static stack cipherStack;
 static int_stack jumpStack;
 static struct symbol SymbolTable[SYMBOL_TABLE_SIZE];
 static char* scope;
-static char* IRCode[MAX_PROGRAM_SIZE]; // TO-DO. Do this structure variable in size.
+static char* IRCode[MAX_PROGRAM_SIZE];
 
-
-static int operatorStackFirstTime = TRUE;
-static int operandStackFirstTime = TRUE;
 static int temporals_counter = 1;
 static int program_counter = 0;
 
@@ -36,6 +32,8 @@ static int program_counter = 0;
 /**                                                                        **/
 /****************************************************************************/
 
+//Esta funcion lee un Lexema
+//Regresa que tipo de dato es
 char *getTypeFromValue(char *value){
 	if(strstr(value, "\"") != NULL) {
 		return "string";
@@ -50,11 +48,19 @@ char *getTypeFromValue(char *value){
 	}
 }
 
+//Esta funcion lee un identificador (a.k.a una variable)
+//Regresa el tipo de dato del identificador (int, double, string, boolean)
 char *getTypeFromSymbol(char *symbol, char *scope){
-	//TO-DO check for nulls on symbol
+	if (NULL==symbol || NULL==scope){
+		printf("LINE: %-4d  CALL: getTypeFromSymbol()\t", g_lineno);
+		printf("FATAL: Null reference.\n");
+		exit(EXIT_FAILURE);
+	}
 	return memberType(SymbolTable, symbol, scope);
 }
 
+//Esta funcion imprime la tabla de variables
+//Solo se manda a llamar cuando la constante VERBOSE es 1
 void DBG_PrintSymbolTable(struct symbol hashtable[]){
 	printf("\nSYMBOL TABLE\n");
 	printf("%15s  %10s  ------   -----  -------  ----\n","----------","----------");
@@ -67,16 +73,12 @@ void DBG_PrintSymbolTable(struct symbol hashtable[]){
   }
 }
 
+//Esta funcion imprime el codigo intermedio del programa
+//Solo se manda a llamar cuando la constante VERBOSE es 1
 void DBG_PrintIRCode(){
 	printf("\nIR CODE\n");
 	for(int i=0;i<program_counter;i++)
 		printf("%5d: %s\n",i, IRCode[i]);
-}
-
-int PRG_SaveIRCode(){ 
-	for(int i=0;i<program_counter;i++)
-		fprintf(outputFile,"%s\n",IRCode[i]);
-  return 1;
 }
 
 /****************************************************************************/
@@ -85,14 +87,26 @@ int PRG_SaveIRCode(){
 /**                                                                        **/
 /****************************************************************************/
 
-//Recibe un operador valido de LEX. + - * / < > == != <= >= || &&
-//Tambien en operand recibe el tipo de los operandos (int,int) (string,int)
-// Al parecerer al de la derecha se le opera lo de la izquierda
+// REGLA: program
+// Esta funcion guarda el codigo en el FILE* outputFile especificado en main
+void PRG_SaveIRCode(){ 
+	for(int i=0;i<program_counter;i++)
+		fprintf(outputFile,"%s\n",IRCode[i]);
+}
+
+// Esta funcion representa un cubo semantico
+// Recibe un operador y sus operandos
+// Regresa el tipo resultante
 char * PRG_SemanticCube(char* op, char *operand1, char *operand2){
+	if (NULL==op || NULL==operand1 || NULL==operand2){
+		printf("LINE: %-4d  CALL: PRG_SemanticCube()\t", g_lineno);
+		printf("FATAL: Null reference.\n");
+		exit(EXIT_FAILURE);
+	}
 		
 	char *result_type;
 	char *opcode;
-	opcode = strdup("ERR");
+	
 	// (boolean, boolean)
 	if(strcmp(operand1,"boolean")==0 && strcmp(operand2,"boolean")==0){
 		if(strcmp(op,"==")==0){
@@ -108,6 +122,7 @@ char * PRG_SemanticCube(char* op, char *operand1, char *operand2){
 			opcode = strdup("ANDV");
 			result_type = strdup("boolean");
 		}else{
+			opcode = strdup("ERRR");
 			result_type = strdup("error");
 		}
 		stackPush(&operatorStack,opcode);
@@ -117,8 +132,10 @@ char * PRG_SemanticCube(char* op, char *operand1, char *operand2){
 	// (int, int)
 	if(strcmp(operand1,"int")==0 && strcmp(operand2,"int")==0){
 		if(strcmp(op,"||")==0){
+			opcode = strdup("ERRR");
 			result_type = strdup("error");
 		}else if(strcmp(op,"&&")==0){
+			opcode = strdup("ERRR");
 			result_type = strdup("error");
 		}else if(strcmp(op,"==")==0){
 			opcode = strdup("EQLV");
@@ -151,6 +168,7 @@ char * PRG_SemanticCube(char* op, char *operand1, char *operand2){
 			opcode = strdup("ISUB");
 			result_type = strdup("int");
 		}else{
+			opcode = strdup("ERRR");
 			result_type = strdup("error");
 		}
 		stackPush(&operatorStack,opcode);
@@ -162,8 +180,10 @@ char * PRG_SemanticCube(char* op, char *operand1, char *operand2){
 		(strcmp(operand1,"double")==0 && strcmp(operand2,"int")==0) ||
 	    (strcmp(operand1,"int")==0 && strcmp(operand2,"double")==0) ){
 		if(strcmp(op,"||")==0){
+			opcode = strdup("ERRR");
 			result_type = strdup("error");
 		}else if(strcmp(op,"&&")==0){
+			opcode = strdup("ERRR");
 			result_type = strdup("error");
 		}else if(strcmp(op,"==")==0){
 			opcode = strdup("EQLV");
@@ -196,6 +216,7 @@ char * PRG_SemanticCube(char* op, char *operand1, char *operand2){
 			opcode = strdup("DSUB");
 			result_type = strdup("double");
 		}else{
+			opcode = strdup("ERRR");
 			result_type = strdup("error");
 		}
 		stackPush(&operatorStack,opcode);
@@ -469,7 +490,8 @@ void PRG_EncryptCode(){
 		command = strdup(tmp_string[0]);   // open ssl enc -a -aes-256-cbc -k password
 		free(tmp_string[0]);
 		
-		printf("\n%s\n", command);
+		if(VERBOSE)
+			printf("\n%s\n", command);
 		
 		FILE *crypto_engine = popen(command, "w");
 		for(int i=0;i<program_counter;i++){
@@ -1231,13 +1253,15 @@ Atributos para llamadas de funciones:
 	//TO-DO pasar las dos funciones de al final para el final de main.c
 	//que pedo con los programas sin secerto.. checar si se awita el shift reduce
 	//remplazar esa funcion de al final con una seccion de los tamaños del ERA:
-program   		: secrets {  PRG_Initialize(); } vardeclarations functions eraupdate { PRG_EncryptCode(); PRG_SaveIRCode(); }
-							| secrets {  PRG_Initialize(); } functions eraupdate { PRG_EncryptCode(); PRG_SaveIRCode(); }
+program   		: secrets {  PRG_Initialize(); } vardeclarations functions eraupdate a_prgend
+							| secrets {  PRG_Initialize(); } functions eraupdate a_prgend
 eraupdate 		: { PRG_ERAUpdate(); }
+a_prgend			: { if(VERBOSE){ DBG_PrintSymbolTable(SymbolTable); DBG_PrintIRCode(); } PRG_EncryptCode(); PRG_SaveIRCode(); }
 
 secrets				: secrets secret
 							| secret
 
+//Esta regla es la que ocasiona el warning the "shift/reduce" conflict. But be no afraid. Yacc lo resuelve sin problemas
 secret				: /* empty */ | CIPHERTKN STRINGVALTKN COMMATKN STRINGVALTKN { PRG_PushCipher($2,$4); } SEMICOLONTKN
 
 functions			: functions function

@@ -22,3 +22,5 @@ clean:
 	rm -f *.out &> /dev/null
 	rm -f mvm.py &> /dev/null
 	rm -f mcc &> /dev/null
+	rm src/lex.yy.c
+	rm src/y.tab.c

@@ -11,8 +11,6 @@
 char lexeme[MAXTOKENLEXEME+1];
 int g_lineno = 1;
 %}
-%option yylineno
-
 
 integer [0-9]+
 double [0-9]+\.[0-9]+
@@ -74,6 +72,9 @@ comments \/\/.*
 {newline} {g_lineno++;}
 %%
 
+// Esta funcion es requesito de LEX
+// Regresamos 1 si queremos detener despues de EOF
+// Regresamos 0 si queremos seguir leyendo en otro lado
 int yywrap()
 {
         return 1;
